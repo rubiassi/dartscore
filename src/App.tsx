@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { createTheme } from '@mui/material/styles';
@@ -24,6 +24,22 @@ const theme = createTheme({
   },
 });
 
+// Wrapper component for X01Game to handle state
+const X01GameWrapper = () => {
+  const location = useLocation();
+  const gameConfig = location.state;
+
+  if (!gameConfig) {
+    return <Navigate to="/x01setup" replace />;
+  }
+
+  return (
+    <NavigationLayout>
+      <X01Game gameConfig={gameConfig} players={gameConfig.players} />
+    </NavigationLayout>
+  );
+};
+
 function App() {
   return (
     <ThemeProvider theme={theme}>
@@ -37,7 +53,7 @@ function App() {
           <Route path="/dashboard" element={<NavigationLayout><Dashboard /></NavigationLayout>} />
           <Route path="/local" element={<NavigationLayout><Local /></NavigationLayout>} />
           <Route path="/x01setup" element={<NavigationLayout><X01Setup /></NavigationLayout>} />
-          <Route path="/x01game" element={<NavigationLayout><X01Game /></NavigationLayout>} />
+          <Route path="/x01game" element={<X01GameWrapper />} />
           
           {/* Placeholder routes */}
           <Route path="/profile" element={<NavigationLayout><div>Profile Coming Soon</div></NavigationLayout>} />

@@ -1,189 +1,155 @@
 import {
   Box,
-  Paper,
   Typography,
-  Grid,
-  Divider,
-  useTheme,
-  useMediaQuery,
-  Stack,
-  IconButton,
-  Button
 } from '@mui/material';
-import CheckoutGuide from './CheckoutGuide';
-import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
-import { useState, useCallback } from 'react';
 
 interface PlayerStatsProps {
   name: string;
   score: number;
   isActive: boolean;
   average: number;
+  setAverage?: number;
+  legAverage?: number;
   lastThrows: number[];
   roundScore: number;
   ninedartsAvg: number;
   checkoutPercentage: number;
-  onEndGame?: () => void;
+  setsWon?: number;
+  legsWon?: number;
+  dartsThrown?: number;
+  doubleAttempts?: number;
+  checkoutThrows?: number;
 }
 
-const PlayerStats = ({ 
-  name, 
-  score, 
-  isActive, 
-  average, 
+const PlayerStats: React.FC<PlayerStatsProps> = ({
+  name,
+  score,
+  isActive,
+  average,
+  setAverage = 0,
+  legAverage = 0,
   lastThrows,
   roundScore,
   ninedartsAvg,
   checkoutPercentage,
-  onEndGame
-}: PlayerStatsProps) => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  // Beregn seneste score - hvis der ikke er nogen score endnu, vis '-'
+  setsWon = 0,
+  legsWon = 0,
+  dartsThrown = 0,
+  doubleAttempts = 0,
+  checkoutThrows = 0,
+}) => {
   const latestScore = lastThrows.length > 0 ? lastThrows[0] || '-' : '-';
 
-  const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen();
-      setIsFullscreen(false);
-    }
-  }, []);
-
   return (
-    <Paper
-      elevation={isActive ? 8 : 1}
+    <Box
       sx={{
-        p: isMobile ? 1 : 2,
-        bgcolor: isActive ? 'primary.light' : 'background.paper',
         height: '100%',
+        bgcolor: '#2c3e50',
+        color: isActive ? '#fff' : 'rgba(255,255,255,0.5)',
         display: 'flex',
         flexDirection: 'column',
-        position: 'relative'
+        position: 'relative',
+        borderRight: '1px solid #34495e'
       }}
     >
-      {/* Knapper i øverste højre hjørne */}
-      <Box
-        sx={{
-          position: 'absolute',
-          top: 8,
-          right: 8,
-          display: 'flex',
-          gap: 1,
-          zIndex: 1
-        }}
-      >
-        <IconButton
-          onClick={toggleFullscreen}
-          size={isMobile ? "small" : "medium"}
-          sx={{ bgcolor: 'background.paper' }}
-        >
-          {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-        </IconButton>
-        <Button
-          variant="contained"
-          color="error"
-          size={isMobile ? "small" : "medium"}
-          onClick={onEndGame}
-          sx={{ minWidth: 0 }}
-        >
-          Afslut spil
-        </Button>
-      </Box>
-
-      <Box sx={{ mb: 1, textAlign: 'center' }}>
+      {isActive && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            bgcolor: '#4caf50',
+            m: 2
+          }}
+        />
+      )}
+      
+      <Box sx={{ p: 2 }}>
         <Typography 
-          variant={isMobile ? "h6" : "h5"} 
-          gutterBottom 
-          sx={{ mb: 0.5 }}
+          sx={{ 
+            fontSize: '0.875rem',
+            mb: 1,
+            ml: 3
+          }}
         >
           {name}
         </Typography>
         <Typography 
-          variant={isMobile ? "h3" : "h2"} 
+          variant="h1"
           sx={{ 
-            fontWeight: 'bold',
-            lineHeight: 1
+            fontSize: '5rem',
+            fontWeight: 700,
+            lineHeight: 1,
+            ml: 3
           }}
         >
           {score}
         </Typography>
-        <Box 
-          sx={{ 
-            mt: 1, 
-            height: isMobile ? '32px' : '40px',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center'
-          }}
-        >
-          {score <= 170 && score >= 2 && <CheckoutGuide score={score} />}
-        </Box>
       </Box>
 
-      <Divider sx={{ my: 1 }} />
-
-      <Typography 
-        variant="subtitle2" 
-        color="text.secondary"
-        sx={{ mb: 1, textAlign: 'center' }}
-      >
-        Seneste score: {latestScore}
-      </Typography>
-
-      <Stack
-        direction="row"
-        divider={<Divider orientation="vertical" flexItem />}
-        spacing={1}
-        alignItems="center"
-        justifyContent="space-between"
-        sx={{ px: 1 }}
-      >
-        <Box sx={{ flex: 1, textAlign: 'center' }}>
-          <Typography 
-            variant="subtitle2" 
-            color="text.secondary"
-            sx={{ fontSize: isMobile ? '0.7rem' : '0.8rem' }}
-          >
-            Gennemsnit
-          </Typography>
-          <Typography variant={isMobile ? "body1" : "h6"}>
-            {average.toFixed(1)}
-          </Typography>
+      <Box sx={{ px: 2, flex: 1 }}>
+        <Box sx={{ mb: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+            <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Darts:</Typography>
+            <Typography>{dartsThrown}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+            <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Checkout:</Typography>
+            <Typography>{checkoutPercentage.toFixed(2)}%</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+            <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Double Attempts:</Typography>
+            <Typography>{doubleAttempts}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Set:</Typography>
+              <Typography>{setsWon}</Typography>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Leg:</Typography>
+              <Typography>{legsWon}</Typography>
+            </Box>
+          </Box>
         </Box>
 
-        <Box sx={{ flex: 1, textAlign: 'center' }}>
-          <Typography 
-            variant="subtitle2" 
-            color="text.secondary"
-            sx={{ fontSize: isMobile ? '0.7rem' : '0.8rem' }}
-          >
-            9 darts gns.
-          </Typography>
-          <Typography variant={isMobile ? "body1" : "h6"}>
-            {ninedartsAvg.toFixed(1)}
-          </Typography>
+        <Box sx={{ mb: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+            <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Game:</Typography>
+            <Typography>{average.toFixed(2)}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+            <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Set:</Typography>
+            <Typography>{setAverage.toFixed(2)}</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Leg:</Typography>
+            <Typography>{legAverage.toFixed(2)}</Typography>
+          </Box>
         </Box>
 
-        <Box sx={{ flex: 1, textAlign: 'center' }}>
-          <Typography 
-            variant="subtitle2" 
-            color="text.secondary"
-            sx={{ fontSize: isMobile ? '0.7rem' : '0.8rem' }}
-          >
-            Checkout %
-          </Typography>
-          <Typography variant={isMobile ? "body1" : "h6"}>
-            {checkoutPercentage.toFixed(1)}%
-          </Typography>
+        <Box 
+          sx={{ 
+            mt: 'auto',
+            py: 1.5,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2
+          }}
+        >
+          <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Last score:</Typography>
+          <Typography>{latestScore}</Typography>
+          {checkoutThrows > 0 && (
+            <Typography sx={{ ml: 'auto', color: '#4caf50' }}>
+              {checkoutThrows} darts
+            </Typography>
+          )}
         </Box>
-      </Stack>
-    </Paper>
+      </Box>
+    </Box>
   );
 };
 

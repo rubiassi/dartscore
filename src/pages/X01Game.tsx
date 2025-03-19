@@ -1,370 +1,638 @@
-import { useState, useCallback } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Container,
-  Typography,
-  Grid,
-  Button,
-  Divider,
-  useMediaQuery,
-  useTheme,
-} from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, useTheme, useMediaQuery } from '@mui/material';
 import ScoreInput from '../components/game/ScoreInput';
-import PlayerStats from '../components/game/PlayerStats';
 import CheckoutDialog from '../components/game/CheckoutDialog';
 import CheckoutValidator from '../utils/CheckoutValidator';
+import { GameConfig, Player, CheckoutGuide } from '../types/game';
 
-interface GameConfig {
-  gameType: number;
-  players: string[];
-  sets: number;
-  legs: number;
+interface X01GameProps {
+  gameConfig: GameConfig;
+  players: Player[];
 }
 
-interface PlayerState {
-  score: number;
-  throws: number[][];  // Array af runder, hver runde har 1 score (sum af 3 pile)
-  roundScores: number[];  // Score for hver runde
-  average: number;
-  setsWon: number;
-  legsWon: number;
-  checkoutAttempts: number;  // Antal forsøg på checkout
-  checkoutSuccesses: number; // Antal succesfulde checkouts
-  firstNineScores: number[]; // Scores for de første 9 pile i hvert leg
-  currentLegScores: number; // Antal scores i det nuværende leg
-  dartsThrown: number;  // Totalt antal pile kastet
-  checkoutDartsThrown: number;  // Antal pile brugt på checkouts
-}
-
-const X01Game = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const gameConfig = location.state as GameConfig;
+const X01Game: React.FC<X01GameProps> = ({ gameConfig, players }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'lg'));
+  const appBarHeight = isMobile ? 56 : 64;
 
-  const [currentPlayer, setCurrentPlayer] = useState(0);
-  const [playerStates, setPlayerStates] = useState<PlayerState[]>(
-    gameConfig.players.map(() => ({
-      score: gameConfig.gameType,
-      throws: [[]],
-      roundScores: [],
-      average: 0,
-      setsWon: 0,
-      legsWon: 0,
-      checkoutAttempts: 0,
-      checkoutSuccesses: 0,
-      firstNineScores: [],
-      currentLegScores: 0,
-      dartsThrown: 0,
-      checkoutDartsThrown: 0
-    }))
+  const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
+  const [scores, setScores] = useState<{ [key: string]: number }>(
+    Object.fromEntries(players.map(p => [p.id, gameConfig.startingScore]))
   );
-
-  // State for checkout dialog
+  const [averages, setAverages] = useState<{ [key: string]: number }>(
+    Object.fromEntries(players.map(p => [p.id, 0]))
+  );
+  const [lastThrows, setLastThrows] = useState<{ [key: string]: number[] }>(
+    Object.fromEntries(players.map(p => [p.id, []]))
+  );
+  const [dartsThrown, setDartsThrown] = useState<{ [key: string]: number }>(
+    Object.fromEntries(players.map(p => [p.id, 0]))
+  );
+  const [checkoutPercentages, setCheckoutPercentages] = useState<{ [key: string]: number }>(
+    Object.fromEntries(players.map(p => [p.id, 0]))
+  );
+  const [setsWon, setSetsWon] = useState<{ [key: string]: number }>(
+    Object.fromEntries(players.map(p => [p.id, 0]))
+  );
+  const [legsWon, setLegsWon] = useState<{ [key: string]: number }>(
+    Object.fromEntries(players.map(p => [p.id, 0]))
+  );
+  const [setAvg, setSetAvg] = useState<{ [key: string]: number }>(
+    Object.fromEntries(players.map(p => [p.id, 0]))
+  );
+  const [legAvg, setLegAvg] = useState<{ [key: string]: number }>(
+    Object.fromEntries(players.map(p => [p.id, 0]))
+  );
+  const [doubleAttempts, setDoubleAttempts] = useState<{ [key: string]: number }>(
+    Object.fromEntries(players.map(p => [p.id, 0]))
+  );
+  const [checkoutThrows, setCheckoutThrows] = useState<{ [key: string]: number }>(
+    Object.fromEntries(players.map(p => [p.id, 0]))
+  );
+  const [checkoutGuide, setCheckoutGuide] = useState<CheckoutGuide | null>(null);
   const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
-  const [pendingScore, setPendingScore] = useState<number | null>(null);
   const [checkoutInfo, setCheckoutInfo] = useState<{
     route?: string;
     remainingScore?: number;
     isCheckoutAttempt: boolean;
   } | null>(null);
+  const [selectedScore, setSelectedScore] = useState<number>(0);
 
-  const calculateAverage = (scores: number[][]) => {
-    const totalScore = scores.reduce((sum, round) => 
-      sum + (round[0] || 0), 0
-    );
-    return scores.length > 0 ? totalScore / scores.length : 0;
-  };
-
-  const calculateNineDartsAverage = (scores: number[]) => {
-    if (scores.length === 0) return 0;
-    const total = scores.reduce((sum, score) => sum + score, 0);
-    return total / scores.length;
-  };
-
-  const calculateCheckoutPercentage = (attempts: number, successes: number) => {
-    if (attempts === 0) return 0;
-    return (successes / attempts) * 100;
-  };
-
-  const handleCheckoutDialogClose = (response: { 
-    hadDoubleAttempt?: boolean; 
-    isCheckout?: boolean; 
-    dartsUsed?: number;
-    doubleAttempts?: number;
-  }) => {
-    setShowCheckoutDialog(false);
-    if (pendingScore === null) return;
-
-    const currentPlayerState = playerStates[currentPlayer];
-    const newPlayerStates = [...playerStates];
-
-    if (response.hadDoubleAttempt !== undefined) {
-      // Dette var et checkout forsøg
-      if (response.hadDoubleAttempt) {
-        newPlayerStates[currentPlayer].checkoutAttempts++;
-      }
-      processScore(pendingScore, newPlayerStates);
-    } else if (response.isCheckout !== undefined) {
-      // Dette var en potentiel checkout (score = 0)
-      if (response.isCheckout && response.dartsUsed) {
-        // Succesfuld checkout
-        newPlayerStates[currentPlayer].checkoutAttempts++;
-        newPlayerStates[currentPlayer].checkoutSuccesses++;
-        newPlayerStates[currentPlayer].checkoutDartsThrown += response.doubleAttempts || 1; // Brug doubleAttempts hvis angivet
-        // Juster det totale antal pile baseret på hvor mange der blev brugt
-        newPlayerStates[currentPlayer].dartsThrown -= (3 - response.dartsUsed);
-        processScore(pendingScore, newPlayerStates);
-        
-        // Start næste leg
-        startNewLeg(newPlayerStates);
-      } else {
-        // Bust - gå til næste spiller uden at registrere scoren
-        setCurrentPlayer((currentPlayer + 1) % gameConfig.players.length);
-      }
-    }
-
-    setPendingScore(null);
-    setCheckoutInfo(null);
-  };
-
-  const startNewLeg = (states: PlayerState[]) => {
-    // Nulstil score for alle spillere
-    for (let i = 0; i < states.length; i++) {
-      states[i].score = gameConfig.gameType;
-      states[i].currentLegScores = 0;
-      states[i].throws.push([]); // Start ny runde for alle spillere
-    }
-    setPlayerStates([...states]);
-  };
-
-  const processScore = (score: number, states: PlayerState[]) => {
-    const currentPlayerState = states[currentPlayer];
-    const newScore = currentPlayerState.score - score;
+  const handleScore = (score: number, dartsUsed: number = 3, isDouble: boolean = false) => {
+    const currentPlayer = players[currentPlayerIndex];
+    const currentScore = scores[currentPlayer.id];
     
-    // Add score to current round
-    states[currentPlayer].throws[states[currentPlayer].throws.length - 1] = [score];
-    states[currentPlayer].score = newScore;
-    states[currentPlayer].roundScores.push(score);
-
-    // Opdater first nine scores - tæl de første 3 runder i hvert leg
-    if (states[currentPlayer].currentLegScores < 3) {
-      states[currentPlayer].firstNineScores.push(score);
-    }
-    states[currentPlayer].currentLegScores++;
-
-    // Hvis leg er slut (score = 0), nulstil currentLegScores
-    if (newScore === 0) {
-      for (let player of states) {
-        player.currentLegScores = 0;
+    // Håndtér 0-score (bust eller miss)
+    if (score === 0) {
+      if (gameConfig.doubleOut) {
+        setDoubleAttempts(prev => ({
+          ...prev,
+          [currentPlayer.id]: prev[currentPlayer.id] + 1
+        }));
       }
-      // Opdater checkout statistik
-      const checkoutInfo = CheckoutValidator.validateCheckout(currentPlayerState.score, score);
-      if (checkoutInfo.isPossible) {
-        states[currentPlayer].checkoutSuccesses++;
-        states[currentPlayer].checkoutDartsThrown += checkoutInfo.minimumDarts;
-      }
-    }
-
-    // Opdater antal kastede pile
-    states[currentPlayer].dartsThrown += 3;  // Standard er 3 pile per runde
-
-    // Update average
-    states[currentPlayer].average = calculateAverage(states[currentPlayer].throws);
-
-    setPlayerStates(states);
-
-    // Move to next player
-    setCurrentPlayer((currentPlayer + 1) % gameConfig.players.length);
-    // Start new round for next player
-    states[currentPlayer].throws.push([]);
-  };
-
-  const handleScore = (score: number) => {
-    const currentPlayerState = playerStates[currentPlayer];
-    
-    // Check if score would go below 0
-    if (currentPlayerState.score - score < 0) {
-      // Bust - next player
-      setCurrentPlayer((currentPlayer + 1) % gameConfig.players.length);
+      setCurrentPlayerIndex((current) => 
+        current === players.length - 1 ? 0 : current + 1
+      );
       return;
     }
 
-    // Hvis scoren vil give 0, vis checkout dialog
-    if (currentPlayerState.score - score === 0) {
-      setPendingScore(score);
-      setCheckoutInfo({
-        isCheckoutAttempt: false
-      });
-      setShowCheckoutDialog(true);
-      return;
-    }
+    const newScore = currentScore - score;
 
     // Tjek for mulig checkout
-    if (currentPlayerState.score <= 170) {
-      const checkoutInfo = CheckoutValidator.checkPossibleDoubleAttempt(
-        currentPlayerState.score,
-        score
+    if (newScore === 0) {
+      if (gameConfig.doubleOut && !isDouble) {
+        // Brug CheckoutValidator til at tjekke, om scoren kunne være en double-checkout
+        const checkoutInfo = CheckoutValidator.validateCheckout(currentScore, score);
+        if (checkoutInfo.isPossible) {
+          setSelectedScore(score);
+          setCheckoutInfo({
+            route: checkoutInfo.checkoutRoute,
+            remainingScore: 0,
+            isCheckoutAttempt: true
+          });
+          setShowCheckoutDialog(true);
+          return;
+        } else {
+          // Ugyldig checkout (ikke double)
+          setDoubleAttempts(prev => ({
+            ...prev,
+            [currentPlayer.id]: prev[currentPlayer.id] + 1
+          }));
+          setCurrentPlayerIndex((current) => 
+            current === players.length - 1 ? 0 : current + 1
+          );
+          return;
+        }
+      }
+    } else if (newScore < 0 || (gameConfig.doubleOut && newScore === 1)) {
+      // Bust - score er for høj eller efterlader 1 (ugyldig checkout når doubleOut er aktiv)
+      setCurrentPlayerIndex((current) => 
+        current === players.length - 1 ? 0 : current + 1
       );
-
-      if (checkoutInfo.possibleDoubleAttempt && checkoutInfo.checkoutRoute) {
-        setPendingScore(score);
+      return;
+    } else if (newScore > 0 && newScore <= 170 && gameConfig.doubleOut) {
+      // Tjek om spilleren kunne forsøge checkout på næste kast
+      const checkoutInfo = CheckoutValidator.checkPossibleDoubleAttempt(currentScore, score);
+      if (checkoutInfo.possibleDoubleAttempt) {
+        setSelectedScore(score);
         setCheckoutInfo({
           route: checkoutInfo.checkoutRoute,
-          remainingScore: currentPlayerState.score - score,
-          isCheckoutAttempt: true
+          remainingScore: newScore,
+          isCheckoutAttempt: false
         });
         setShowCheckoutDialog(true);
         return;
       }
     }
 
-    // Hvis ingen checkout mulighed, fortsæt normalt
-    const newPlayerStates = [...playerStates];
-    processScore(score, newPlayerStates);
+    // Normal score opdatering når det ikke er checkout
+    applyScore(score, dartsUsed, isDouble, newScore);
   };
 
-  const handleUndo = () => {
-    if (currentPlayer === 0 && playerStates[playerStates.length - 1].throws[0].length === 0) return; // Nothing to undo
+  const applyScore = (score: number, dartsUsed: number, isDouble: boolean, newScore: number) => {
+    const currentPlayer = players[currentPlayerIndex];
+  
+    // Opdater score
+    setScores(prev => ({
+      ...prev,
+      [currentPlayer.id]: newScore
+    }));
 
-    const newPlayerStates = [...playerStates];
-    let newCurrentPlayer = currentPlayer;
+    // Opdater statistik
+    setLastThrows(prev => ({
+      ...prev,
+      [currentPlayer.id]: [score, ...(prev[currentPlayer.id] || [])].slice(0, 3)
+    }));
 
-    // Go back to previous player
-    newCurrentPlayer = (currentPlayer - 1 + gameConfig.players.length) % gameConfig.players.length;
-    
-    // Get the last throw
-    const previousPlayerThrows = newPlayerStates[newCurrentPlayer].throws;
-    const lastRound = previousPlayerThrows[previousPlayerThrows.length - 1];
-    
-    if (lastRound && lastRound.length > 0) {
-      // Restore previous score
-      const lastScore = lastRound[0];
-      newPlayerStates[newCurrentPlayer].score += lastScore;
-      
-      // Remove last score
-      previousPlayerThrows.pop();
-      if (previousPlayerThrows.length === 0) {
-        previousPlayerThrows.push([]);
-      }
-      
-      // Remove from roundScores
-      newPlayerStates[newCurrentPlayer].roundScores.pop();
+    setDartsThrown(prev => ({
+      ...prev,
+      [currentPlayer.id]: prev[currentPlayer.id] + dartsUsed
+    }));
 
-      // Hvis det var en af de første 3 runder i et leg, fjern også fra firstNineScores
-      if (newPlayerStates[newCurrentPlayer].currentLegScores <= 3) {
-        newPlayerStates[newCurrentPlayer].firstNineScores.pop();
-      }
-      newPlayerStates[newCurrentPlayer].currentLegScores = Math.max(0, newPlayerStates[newCurrentPlayer].currentLegScores - 1);
+    // Hvis det er en checkout, opdater checkout statistik
+    if (newScore === 0) {
+      setCheckoutThrows(prev => ({
+        ...prev,
+        [currentPlayer.id]: dartsUsed
+      }));
       
-      // Update average
-      newPlayerStates[newCurrentPlayer].average = calculateAverage(previousPlayerThrows);
+      // Opdater checkout procentdel
+      const attempts = doubleAttempts[currentPlayer.id];
+      const successRate = attempts > 0 ? (1 / (attempts + 1)) * 100 : 100;
+      setCheckoutPercentages(prev => ({
+        ...prev,
+        [currentPlayer.id]: successRate
+      }));
     }
 
-    setPlayerStates(newPlayerStates);
-    setCurrentPlayer(newCurrentPlayer);
+    // Beregn nyt gennemsnit
+    const throws = lastThrows[currentPlayer.id];
+    const newThrows = [score, ...throws];
+    const average = (newThrows.reduce((a, b) => a + b, 0) / newThrows.length) * (3 / dartsUsed);
+    
+    setAverages(prev => ({
+      ...prev,
+      [currentPlayer.id]: average
+    }));
+
+    // Gå til næste spiller
+    setCurrentPlayerIndex((current) => 
+      current === players.length - 1 ? 0 : current + 1
+    );
   };
 
-  const handleEndGame = useCallback(() => {
-    // TODO: Implementer dialog der bekræfter afslutning af spillet
-    if (window.confirm('Er du sikker på at du vil afslutte spillet?')) {
-      navigate('/');
+  const handleCheckoutResponse = (response: { 
+    hadDoubleAttempt?: boolean; 
+    isCheckout?: boolean; 
+    dartsUsed?: number;
+    doubleAttempts?: number;
+  }) => {
+    const currentPlayer = players[currentPlayerIndex];
+    const currentPlayerScore = scores[currentPlayer.id];
+    
+    if (checkoutInfo?.isCheckoutAttempt) {
+      // Håndtér checkout bekræftelse
+      if (response.isCheckout && response.dartsUsed) {
+        // Gyldig checkout
+        applyScore(selectedScore, response.dartsUsed, true, 0);
+        
+        // Opdater double-forsøg, hvis angivet
+        setDoubleAttempts(prev => ({
+          ...prev,
+          [currentPlayer.id]: prev[currentPlayer.id] + (response.doubleAttempts || 0)
+        }));
+      } else {
+        // Ugyldig checkout (bust)
+        setDoubleAttempts(prev => ({
+          ...prev,
+          [currentPlayer.id]: prev[currentPlayer.id] + 1
+        }));
+        setCurrentPlayerIndex((current) => 
+          current === players.length - 1 ? 0 : current + 1
+        );
+      }
+    } else {
+      // Håndtér almindeligt kast med mulig double forsøg
+      if (response.hadDoubleAttempt) {
+        setDoubleAttempts(prev => ({
+          ...prev,
+          [currentPlayer.id]: prev[currentPlayer.id] + 1
+        }));
+      }
+      
+      // Opdater spillerens score
+      const newScore = currentPlayerScore - selectedScore;
+      applyScore(selectedScore, 3, false, newScore);
     }
-  }, [navigate]);
+    
+    setShowCheckoutDialog(false);
+    setCheckoutInfo(null);
+  };
+
+  // Opdater checkout guide når spillerens score ændres
+  useEffect(() => {
+    const currentPlayer = players[currentPlayerIndex];
+    const currentScore = scores[currentPlayer.id];
+    
+    if (gameConfig.doubleOut && currentScore <= 170) {
+      const checkoutInfo = CheckoutValidator.checkPossibleDoubleAttempt(currentScore, 0);
+      if (checkoutInfo.possibleDoubleAttempt && checkoutInfo.checkoutRoute) {
+        setCheckoutGuide({
+          score: currentScore,
+          combinations: [checkoutInfo.checkoutRoute]
+        });
+      } else {
+        setCheckoutGuide(null);
+      }
+    } else {
+      setCheckoutGuide(null);
+    }
+  }, [currentPlayerIndex, scores, gameConfig.doubleOut, players]);
 
   return (
-    <Box
-      sx={{
-        height: '100vh',
+    <Box 
+      sx={{ 
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden'
+        marginTop: `${appBarHeight}px`,
+        height: `calc(100vh - ${appBarHeight}px)`,
+        bgcolor: '#2c3e50',
+        overflow: 'hidden',
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        bottom: 0
       }}
     >
-      {/* Top Section - Scores */}
-      <Box
-        sx={{
+      {/* Players Section - Score Area */}
+      <Box 
+        className="score-area"
+        sx={{ 
           flex: 1,
-          overflow: 'auto',
-          p: 2,
-          bgcolor: 'background.default'
+          display: 'flex',
+          flexDirection: 'row',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          overflow: 'hidden'
         }}
       >
-        <Typography 
-          variant={isMobile ? "h5" : "h4"} 
-          gutterBottom 
-          textAlign="center"
-          sx={{ mb: 3 }}
-        >
-          {gameConfig.gameType} - Leg 1, Set 1
-        </Typography>
-
-        <Grid 
-          container 
-          spacing={2}
-          sx={{ mb: 2 }}
-        >
-          {playerStates.map((playerState, index) => (
-            <Grid item xs={12} md={6} key={index}>
-              <PlayerStats
-                name={gameConfig.players[index]}
-                score={playerState.score}
-                isActive={index === currentPlayer}
-                average={calculateAverage(playerState.throws)}
-                lastThrows={playerState.throws[playerState.throws.length - 1] || []}
-                roundScore={playerState.currentLegScores}
-                ninedartsAvg={calculateNineDartsAverage(playerState.firstNineScores)}
-                checkoutPercentage={calculateCheckoutPercentage(playerState.checkoutAttempts, playerState.checkoutSuccesses)}
-                onEndGame={handleEndGame}
+        {players.map((player, index) => (
+          <Box
+            key={player.id}
+            className={index === 0 ? "css-tbnn2" : "css-1cnq292"}
+            sx={{
+              flex: 1,
+              height: '100%',
+              bgcolor: '#2c3e50',
+              color: index === currentPlayerIndex ? '#fff' : 'rgba(255,255,255,0.5)',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative',
+              borderRight: index === 0 ? '1px solid #34495e' : 'none',
+              overflow: 'hidden'
+            }}
+          >
+            {index === currentPlayerIndex && (
+              <Box
+                className="css-vr33al"
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  bgcolor: '#4caf50',
+                  m: 2
+                }}
               />
-            </Grid>
-          ))}
-        </Grid>
+            )}
+            
+            <Box className="css-19midj6" sx={{ p: 2 }}>
+              <Typography 
+                className="css-1iemo1c-MuiTypography-root"
+                sx={{ 
+                  fontSize: {
+                    xs: '0.75rem',     // Mobile: ~15% smaller
+                    sm: '0.8rem',      // Tablet: ~10% smaller
+                    md: '0.875rem'     // Desktop: 100%
+                  },
+                  mb: 1,
+                  ml: 3
+                }}
+              >
+                {player.name}
+              </Typography>
+              <Typography 
+                variant="h1"
+                className="css-1wyzjgh-MuiTypography-root"
+                sx={{ 
+                  fontSize: {
+                    xs: '4rem',        // Mobile: ~20% smaller
+                    sm: '4.5rem',      // Tablet: ~10% smaller
+                    md: '5rem'         // Desktop: 100%
+                  },
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  ml: 3
+                }}
+              >
+                {scores[player.id]}
+              </Typography>
+            </Box>
+
+            <Box className="css-101ju1p" sx={{ px: 2, flex: 1, overflow: 'auto' }}>
+              <Box className="css-1qm1lh" sx={{ mb: 2 }}>
+                <Box className="css-wax5jp" sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                  <Typography 
+                    className="css-1y8dsxu-MuiTypography-root" 
+                    sx={{ 
+                      color: 'rgba(255,255,255,0.7)',
+                      fontSize: {
+                        xs: '0.75rem',  // Mobile: ~15% smaller
+                        sm: '0.8rem',   // Tablet: ~10% smaller
+                        md: '0.875rem'  // Desktop: 100%
+                      }
+                    }}
+                  >
+                    Darts:
+                  </Typography>
+                  <Typography 
+                    className="css-rizt0-MuiTypography-root"
+                    sx={{ 
+                      fontSize: {
+                        xs: '0.75rem',  // Mobile: ~15% smaller
+                        sm: '0.8rem',   // Tablet: ~10% smaller
+                        md: '0.875rem'  // Desktop: 100%
+                      }
+                    }}
+                  >
+                    {dartsThrown[player.id]}
+                  </Typography>
+                </Box>
+                <Box className="css-wax5jp" sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                  <Typography 
+                    className="css-1y8dsxu-MuiTypography-root" 
+                    sx={{ 
+                      color: 'rgba(255,255,255,0.7)',
+                      fontSize: {
+                        xs: '0.75rem',  // Mobile: ~15% smaller
+                        sm: '0.8rem',   // Tablet: ~10% smaller
+                        md: '0.875rem'  // Desktop: 100%
+                      }
+                    }}
+                  >
+                    Checkout:
+                  </Typography>
+                  <Typography 
+                    className="css-rizt0-MuiTypography-root"
+                    sx={{ 
+                      fontSize: {
+                        xs: '0.75rem',  // Mobile: ~15% smaller
+                        sm: '0.8rem',   // Tablet: ~10% smaller
+                        md: '0.875rem'  // Desktop: 100%
+                      }
+                    }}
+                  >
+                    {checkoutPercentages[player.id].toFixed(2)}%
+                  </Typography>
+                </Box>
+                <Box className="css-wax5jp" sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                  <Typography 
+                    className="css-1y8dsxu-MuiTypography-root" 
+                    sx={{ 
+                      color: 'rgba(255,255,255,0.7)',
+                      fontSize: {
+                        xs: '0.75rem',  // Mobile: ~15% smaller
+                        sm: '0.8rem',   // Tablet: ~10% smaller
+                        md: '0.875rem'  // Desktop: 100%
+                      }
+                    }}
+                  >
+                    Double Attempts:
+                  </Typography>
+                  <Typography 
+                    className="css-rizt0-MuiTypography-root"
+                    sx={{ 
+                      fontSize: {
+                        xs: '0.75rem',  // Mobile: ~15% smaller
+                        sm: '0.8rem',   // Tablet: ~10% smaller
+                        md: '0.875rem'  // Desktop: 100%
+                      }
+                    }}
+                  >
+                    {doubleAttempts[player.id]}
+                  </Typography>
+                </Box>
+                <Box className="css-gg4vpm" sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Box className="css-1i27l4i" sx={{ display: 'flex', gap: 1 }}>
+                    <Typography 
+                      className="css-1y8dsxu-MuiTypography-root" 
+                      sx={{ 
+                        color: 'rgba(255,255,255,0.7)',
+                        fontSize: {
+                          xs: '0.75rem',  // Mobile: ~15% smaller
+                          sm: '0.8rem',   // Tablet: ~10% smaller
+                          md: '0.875rem'  // Desktop: 100%
+                        }
+                      }}
+                    >
+                      Set:
+                    </Typography>
+                    <Typography 
+                      className="css-rizt0-MuiTypography-root"
+                      sx={{ 
+                        fontSize: {
+                          xs: '0.75rem',  // Mobile: ~15% smaller
+                          sm: '0.8rem',   // Tablet: ~10% smaller
+                          md: '0.875rem'  // Desktop: 100%
+                        }
+                      }}
+                    >
+                      {setsWon[player.id]}
+                    </Typography>
+                  </Box>
+                  <Box className="css-1i27l4i" sx={{ display: 'flex', gap: 1 }}>
+                    <Typography 
+                      className="css-1y8dsxu-MuiTypography-root" 
+                      sx={{ 
+                        color: 'rgba(255,255,255,0.7)',
+                        fontSize: {
+                          xs: '0.75rem',  // Mobile: ~15% smaller
+                          sm: '0.8rem',   // Tablet: ~10% smaller
+                          md: '0.875rem'  // Desktop: 100%
+                        }
+                      }}
+                    >
+                      Leg:
+                    </Typography>
+                    <Typography 
+                      className="css-rizt0-MuiTypography-root"
+                      sx={{ 
+                        fontSize: {
+                          xs: '0.75rem',  // Mobile: ~15% smaller
+                          sm: '0.8rem',   // Tablet: ~10% smaller
+                          md: '0.875rem'  // Desktop: 100%
+                        }
+                      }}
+                    >
+                      {legsWon[player.id]}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+
+              <Box className="css-1qm1lh" sx={{ mb: 2 }}>
+                <Box className="css-wax5jp" sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                  <Typography 
+                    className="css-1y8dsxu-MuiTypography-root" 
+                    sx={{ 
+                      color: 'rgba(255,255,255,0.7)',
+                      fontSize: {
+                        xs: '0.75rem',  // Mobile: ~15% smaller
+                        sm: '0.8rem',   // Tablet: ~10% smaller
+                        md: '0.875rem'  // Desktop: 100%
+                      }
+                    }}
+                  >
+                    Game:
+                  </Typography>
+                  <Typography 
+                    className="css-rizt0-MuiTypography-root"
+                    sx={{ 
+                      fontSize: {
+                        xs: '0.75rem',  // Mobile: ~15% smaller
+                        sm: '0.8rem',   // Tablet: ~10% smaller
+                        md: '0.875rem'  // Desktop: 100%
+                      }
+                    }}
+                  >
+                    {averages[player.id].toFixed(2)}
+                  </Typography>
+                </Box>
+                <Box className="css-wax5jp" sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                  <Typography 
+                    className="css-1y8dsxu-MuiTypography-root" 
+                    sx={{ 
+                      color: 'rgba(255,255,255,0.7)',
+                      fontSize: {
+                        xs: '0.75rem',  // Mobile: ~15% smaller
+                        sm: '0.8rem',   // Tablet: ~10% smaller
+                        md: '0.875rem'  // Desktop: 100%
+                      }
+                    }}
+                  >
+                    Set:
+                  </Typography>
+                  <Typography 
+                    className="css-rizt0-MuiTypography-root"
+                    sx={{ 
+                      fontSize: {
+                        xs: '0.75rem',  // Mobile: ~15% smaller
+                        sm: '0.8rem',   // Tablet: ~10% smaller
+                        md: '0.875rem'  // Desktop: 100%
+                      }
+                    }}
+                  >
+                    {setAvg[player.id].toFixed(2)}
+                  </Typography>
+                </Box>
+                <Box className="css-gg4vpm" sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography 
+                    className="css-1y8dsxu-MuiTypography-root" 
+                    sx={{ 
+                      color: 'rgba(255,255,255,0.7)',
+                      fontSize: {
+                        xs: '0.75rem',  // Mobile: ~15% smaller
+                        sm: '0.8rem',   // Tablet: ~10% smaller
+                        md: '0.875rem'  // Desktop: 100%
+                      }
+                    }}
+                  >
+                    Leg:
+                  </Typography>
+                  <Typography 
+                    className="css-rizt0-MuiTypography-root"
+                    sx={{ 
+                      fontSize: {
+                        xs: '0.75rem',  // Mobile: ~15% smaller
+                        sm: '0.8rem',   // Tablet: ~10% smaller
+                        md: '0.875rem'  // Desktop: 100%
+                      }
+                    }}
+                  >
+                    {legAvg[player.id].toFixed(2)}
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Box 
+                className="css-17voejd"
+                sx={{ 
+                  mt: 'auto',
+                  py: 1.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2
+                }}
+              >
+                <Typography 
+                  className="css-1y8dsxu-MuiTypography-root" 
+                  sx={{ 
+                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: {
+                      xs: '0.75rem',  // Mobile: ~15% smaller
+                      sm: '0.8rem',   // Tablet: ~10% smaller
+                      md: '0.875rem'  // Desktop: 100%
+                    }
+                  }}
+                >
+                  Last score:
+                </Typography>
+                <Typography 
+                  className="css-rizt0-MuiTypography-root"
+                  sx={{ 
+                    fontSize: {
+                      xs: '0.75rem',  // Mobile: ~15% smaller
+                      sm: '0.8rem',   // Tablet: ~10% smaller
+                      md: '0.875rem'  // Desktop: 100%
+                    }
+                  }}
+                >
+                  {lastThrows[player.id].length > 0 ? lastThrows[player.id][0] : '-'}
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+        ))}
       </Box>
 
-      {/* Bottom Section - Input */}
-      <Box
-        sx={{
-          borderTop: 1,
-          borderColor: 'divider',
-          p: 2,
-          bgcolor: 'background.paper',
-          maxHeight: isMobile ? '60vh' : '45vh',
-          minHeight: isMobile ? '60vh' : '45vh'
+      {/* Score Input Section - Input Area */}
+      <Box 
+        className="input-area"
+        sx={{ 
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
         }}
       >
         <ScoreInput
+          currentPlayer={players[currentPlayerIndex]}
+          currentScore={scores[players[currentPlayerIndex].id]}
           onScore={handleScore}
-          onUndo={handleUndo}
+          gameConfig={gameConfig}
+          checkoutGuide={checkoutGuide}
         />
-
-        <Box sx={{ mt: 2, textAlign: 'center' }}>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={() => {
-              if (window.confirm('Er du sikker på at du vil forlade spillet?')) {
-                navigate('/local');
-              }
-            }}
-          >
-            Afslut spil
-          </Button>
-        </Box>
       </Box>
 
       {/* Checkout Dialog */}
-      {showCheckoutDialog && checkoutInfo && (
-        <CheckoutDialog
-          open={showCheckoutDialog}
-          onClose={handleCheckoutDialogClose}
-          checkoutRoute={checkoutInfo.route}
-          remainingScore={checkoutInfo.remainingScore}
-          isCheckoutAttempt={checkoutInfo.isCheckoutAttempt}
-        />
-      )}
+      <CheckoutDialog
+        open={showCheckoutDialog}
+        onClose={handleCheckoutResponse}
+        checkoutInfo={checkoutInfo}
+        showCheckoutOptions={true}
+      />
     </Box>
   );
 };

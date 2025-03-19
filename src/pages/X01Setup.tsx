@@ -153,20 +153,40 @@ const X01Setup = () => {
   };
 
   const handleStartGame = () => {
+    // Validér at der er mindst 2 spillere
+    if (players.length < 2) {
+      alert('Der skal være mindst 2 spillere for at starte spillet');
+      return;
+    }
+
     const gameConfig = {
+      // Spillere
+      players: players.map(player => ({
+        id: player.id,
+        name: player.name,
+        type: player.type,
+        botDifficulty: player.botDifficulty
+      })),
+      
+      // Spil indstillinger
       startingScore,
       matchFormat,
       sets,
       legs,
       startingIn,
+      
+      // Spil muligheder
       isTraining,
       scoreAnnouncer,
       perDartInput,
       randomStart,
+      
+      // Checkout muligheder
       showCheckout,
       useDoubles,
       dartsThrown
     };
+
     navigate('/x01game', { state: gameConfig });
   };
 

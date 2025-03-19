@@ -18,12 +18,20 @@ interface CheckoutDialogProps {
     dartsUsed?: number;
     doubleAttempts?: number;
   }) => void;
-  checkoutRoute?: string;
-  remainingScore?: number;
-  isCheckoutAttempt: boolean;
+  checkoutInfo: {
+    route?: string;
+    remainingScore?: number;
+    isCheckoutAttempt: boolean;
+  } | null;
+  showCheckoutOptions?: boolean;
 }
 
-const CheckoutDialog = ({ open, onClose, checkoutRoute, remainingScore, isCheckoutAttempt }: CheckoutDialogProps) => {
+const CheckoutDialog: React.FC<CheckoutDialogProps> = ({
+  open,
+  onClose,
+  checkoutInfo,
+  showCheckoutOptions = true
+}) => {
   const [step, setStep] = useState(1);
   const [totalDarts, setTotalDarts] = useState<number | null>(null);
 
@@ -48,7 +56,7 @@ const CheckoutDialog = ({ open, onClose, checkoutRoute, remainingScore, isChecko
     onClose({ isCheckout: false });
   };
 
-  if (isCheckoutAttempt && checkoutRoute) {
+  if (checkoutInfo && checkoutInfo.isCheckoutAttempt && checkoutInfo.route) {
     return (
       <Dialog
         open={open}
@@ -60,9 +68,9 @@ const CheckoutDialog = ({ open, onClose, checkoutRoute, remainingScore, isChecko
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Du har {remainingScore} tilbage.
+            Du har {checkoutInfo.remainingScore} tilbage.
             <Typography sx={{ mt: 1, fontWeight: 'bold' }}>
-              Mulig checkout: {checkoutRoute}
+              Mulig checkout: {checkoutInfo.route}
             </Typography>
             <Typography sx={{ mt: 2 }}>
               Havde du forsøg på en double?
