@@ -1,19 +1,34 @@
 export interface Player {
   id: string;
   name: string;
-  type: 'human' | 'bot';
-  botDifficulty?: 'easy' | 'medium' | 'hard';
+  type: PlayerType;
+  botDifficulty?: string;
+  avatar?: string;
 }
 
+export type PlayerType = 'login' | 'guest' | 'bot' | 'friend';
+
 export interface GameConfig {
+  // Spillere
+  players: Player[];
+  
+  // Spil indstillinger
   startingScore: number;
-  matchFormat: 'firstTo' | 'bestOf';
+  matchFormat: 'first' | 'best';
   sets: number;
   legs: number;
-  doubleIn: boolean;
-  doubleOut: boolean;
-  splitScore: boolean;
-  tieBreak: boolean;
+  startingIn: 'straight' | 'double' | 'triple';
+  outMode: 'double' | 'master' | 'straight';
+  legsPerSet: number;
+  
+  // Spil muligheder
+  isTraining: boolean;
+  scoreAnnouncer: boolean;
+  randomStart: boolean;
+  
+  // Checkout muligheder
+  showCheckout: boolean;
+  useDoubles: boolean;
 }
 
 export interface GameState {

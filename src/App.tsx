@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { createTheme } from '@mui/material/styles';
+import { GameProvider } from './context/GameContext';
 
 // Import pages
 import InfoPage from './pages/InfoPage';
@@ -35,7 +36,15 @@ const X01GameWrapper = () => {
 
   return (
     <NavigationLayout>
-      <X01Game gameConfig={gameConfig} players={gameConfig.players} />
+      <X01Game />
+    </NavigationLayout>
+  );
+};
+
+const X01GameRoute = () => {
+  return (
+    <NavigationLayout>
+      <X01Game />
     </NavigationLayout>
   );
 };
@@ -44,28 +53,30 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<InfoPage />} />
-          
-          {/* Protected routes with navigation */}
-          <Route path="/dashboard" element={<NavigationLayout><Dashboard /></NavigationLayout>} />
-          <Route path="/local" element={<NavigationLayout><Local /></NavigationLayout>} />
-          <Route path="/x01setup" element={<NavigationLayout><X01Setup /></NavigationLayout>} />
-          <Route path="/x01game" element={<X01GameWrapper />} />
-          
-          {/* Placeholder routes */}
-          <Route path="/profile" element={<NavigationLayout><div>Profile Coming Soon</div></NavigationLayout>} />
-          <Route path="/friends" element={<NavigationLayout><div>Friends Coming Soon</div></NavigationLayout>} />
-          <Route path="/teams" element={<NavigationLayout><div>Teams Coming Soon</div></NavigationLayout>} />
-          <Route path="/statistics" element={<NavigationLayout><div>Statistics Coming Soon</div></NavigationLayout>} />
-          <Route path="/history" element={<NavigationLayout><div>History Coming Soon</div></NavigationLayout>} />
-          <Route path="/achievements" element={<NavigationLayout><div>Achievements Coming Soon</div></NavigationLayout>} />
-          <Route path="/settings" element={<NavigationLayout><div>Settings Coming Soon</div></NavigationLayout>} />
-          <Route path="/about" element={<NavigationLayout><div>About Coming Soon</div></NavigationLayout>} />
-        </Routes>
-      </Router>
+      <GameProvider>
+        <Router>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<InfoPage />} />
+            
+            {/* Protected routes with navigation */}
+            <Route path="/dashboard" element={<NavigationLayout><Dashboard /></NavigationLayout>} />
+            <Route path="/local" element={<NavigationLayout><Local /></NavigationLayout>} />
+            <Route path="/x01setup" element={<NavigationLayout><X01Setup /></NavigationLayout>} />
+            <Route path="/x01game" element={<X01GameRoute />} />
+            
+            {/* Placeholder routes */}
+            <Route path="/profile" element={<NavigationLayout><div>Profile Coming Soon</div></NavigationLayout>} />
+            <Route path="/friends" element={<NavigationLayout><div>Friends Coming Soon</div></NavigationLayout>} />
+            <Route path="/teams" element={<NavigationLayout><div>Teams Coming Soon</div></NavigationLayout>} />
+            <Route path="/statistics" element={<NavigationLayout><div>Statistics Coming Soon</div></NavigationLayout>} />
+            <Route path="/history" element={<NavigationLayout><div>History Coming Soon</div></NavigationLayout>} />
+            <Route path="/achievements" element={<NavigationLayout><div>Achievements Coming Soon</div></NavigationLayout>} />
+            <Route path="/settings" element={<NavigationLayout><div>Settings Coming Soon</div></NavigationLayout>} />
+            <Route path="/about" element={<NavigationLayout><div>About Coming Soon</div></NavigationLayout>} />
+          </Routes>
+        </Router>
+      </GameProvider>
     </ThemeProvider>
   );
 }

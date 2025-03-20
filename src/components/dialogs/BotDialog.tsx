@@ -8,11 +8,8 @@ import {
   Radio,
   RadioGroup,
   FormControlLabel,
-  Box,
-  Tooltip,
-  IconButton
+  Box
 } from '@mui/material';
-import InfoIcon from '@mui/icons-material/Info';
 
 interface BotLevel {
   value: string;
@@ -24,45 +21,45 @@ interface BotLevel {
 const botLevels: BotLevel[] = [
   {
     value: 'very-easy',
-    label: 'Very easy',
-    description: 'Perfect for beginners. Bot will make many mistakes.',
-    average: 'Average: < 30'
+    label: 'Meget let',
+    description: 'Perfekt for nybegyndere. Botten vil lave mange fejl.',
+    average: 'Gennemsnit: < 30'
   },
   {
     value: 'easy',
-    label: 'Easy',
-    description: 'For casual players. Bot will play consistently but not too well.',
-    average: 'Average: 30-40'
+    label: 'Let',
+    description: 'For casual spillere. Botten spiller stabilt, men ikke særlig godt.',
+    average: 'Gennemsnit: 30-40'
   },
   {
     value: 'medium',
     label: 'Medium',
-    description: 'For regular players. Bot will provide a good challenge.',
-    average: 'Average: 40-50'
+    description: 'For regelmæssige spillere. Botten giver en god udfordring.',
+    average: 'Gennemsnit: 40-50'
   },
   {
     value: 'medium-hard',
-    label: 'Medium Hard',
-    description: 'For experienced players. Bot will play at a competitive level.',
-    average: 'Average: 50-60'
+    label: 'Medium svær',
+    description: 'For erfarne spillere. Botten spiller på konkurrenceniveau.',
+    average: 'Gennemsnit: 50-60'
   },
   {
     value: 'hard',
-    label: 'Hard',
-    description: 'For advanced players. Bot will play at a high level.',
-    average: 'Average: 60-80'
+    label: 'Svær',
+    description: 'For avancerede spillere. Botten spiller på højt niveau.',
+    average: 'Gennemsnit: 60-80'
   },
   {
     value: 'pro',
     label: 'Pro',
-    description: 'For professional level players. Bot will rarely make mistakes.',
-    average: 'Average: 80-100'
+    description: 'For professionelle spillere. Botten laver sjældent fejl.',
+    average: 'Gennemsnit: 80-100'
   },
   {
     value: 'king',
-    label: 'King',
-    description: 'The ultimate challenge. Bot will play nearly perfect darts.',
-    average: 'Average: 95+'
+    label: 'Kong',
+    description: 'Den ultimative udfordring. Botten spiller næsten perfekt dart.',
+    average: 'Gennemsnit: 95+'
   }
 ];
 
@@ -93,7 +90,7 @@ const BotDialog = ({ open, onClose, onSelectDifficulty }: BotDialogProps) => {
       }}
     >
       <DialogTitle>
-        <Typography variant="h6">Choose bot level</Typography>
+        <Typography variant="h6">Vælg bot niveau</Typography>
       </DialogTitle>
 
       <DialogContent>
@@ -111,9 +108,9 @@ const BotDialog = ({ open, onClose, onSelectDifficulty }: BotDialogProps) => {
               key={level.value}
               sx={{
                 display: 'flex',
-                alignItems: 'center',
+                flexDirection: 'column',
                 mb: 1,
-                p: 1,
+                p: 1.5,
                 borderRadius: 1,
                 bgcolor: selectedDifficulty === level.value ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
                 transition: 'background-color 0.2s',
@@ -135,31 +132,23 @@ const BotDialog = ({ open, onClose, onSelectDifficulty }: BotDialogProps) => {
                   />
                 }
                 label={level.label}
-                sx={{ flexGrow: 1 }}
+                sx={{ 
+                  flexGrow: 1,
+                  mb: 0.5
+                }}
               />
-              <Tooltip 
-                title={
-                  <Box>
-                    <Typography variant="body2">{level.description}</Typography>
-                    <Typography variant="body2" sx={{ mt: 1, fontWeight: 'bold' }}>
-                      {level.average}
-                    </Typography>
-                  </Box>
-                }
-                arrow
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  pl: 4, 
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  fontWeight: 300,
+                  fontSize: '0.75rem',
+                  lineHeight: 1.2
+                }}
               >
-                <IconButton 
-                  size="small"
-                  sx={{ 
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    '&:hover': {
-                      color: 'white'
-                    }
-                  }}
-                >
-                  <InfoIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
+                {level.description} • {level.average}
+              </Typography>
             </Box>
           ))}
         </RadioGroup>
@@ -179,7 +168,7 @@ const BotDialog = ({ open, onClose, onSelectDifficulty }: BotDialogProps) => {
               py: 1
             }}
           >
-            Cancel
+            Annuller
           </Button>
           <Button
             fullWidth
@@ -194,7 +183,7 @@ const BotDialog = ({ open, onClose, onSelectDifficulty }: BotDialogProps) => {
               py: 1
             }}
           >
-            OK
+            Vælg
           </Button>
         </Box>
       </DialogContent>

@@ -19,6 +19,8 @@ interface PlayerStatsProps {
   dartsThrown?: number;
   doubleAttempts?: number;
   checkoutThrows?: number;
+  successfulCheckouts?: number;
+  children?: React.ReactNode;
 }
 
 const PlayerStats: React.FC<PlayerStatsProps> = ({
@@ -37,6 +39,8 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({
   dartsThrown = 0,
   doubleAttempts = 0,
   checkoutThrows = 0,
+  successfulCheckouts = 0,
+  children
 }) => {
   const latestScore = lastThrows.length > 0 ? lastThrows[0] || '-' : '-';
 
@@ -67,12 +71,19 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({
         />
       )}
       
-      <Box sx={{ p: 2 }}>
+      <Box 
+        sx={{ 
+          p: 2,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center'
+        }}
+      >
         <Typography 
           sx={{ 
-            fontSize: '0.875rem',
-            mb: 1,
-            ml: 3
+            fontSize: '1rem',
+            mb: 1
           }}
         >
           {name}
@@ -80,70 +91,247 @@ const PlayerStats: React.FC<PlayerStatsProps> = ({
         <Typography 
           variant="h1"
           sx={{ 
-            fontSize: '5rem',
+            fontSize: {
+              xs: '6rem',    // Mobile
+              sm: '7rem',    // Tablet
+              md: '8rem'     // Desktop
+            },
             fontWeight: 700,
-            lineHeight: 1,
-            ml: 3
+            lineHeight: 0.9
           }}
         >
           {score}
         </Typography>
+        <Box 
+          sx={{ 
+            height: {
+              xs: '2rem',    // Mobile
+              sm: '2.3rem',  // Tablet
+              md: '2.5rem'   // Desktop
+            },
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%'
+          }}
+        >
+          {children}
+        </Box>
       </Box>
 
-      <Box sx={{ px: 2, flex: 1 }}>
-        <Box sx={{ mb: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-            <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Darts:</Typography>
-            <Typography>{dartsThrown}</Typography>
+      <Box sx={{ px: 2, flex: 1, mt: -2 }}>
+        <Box sx={{ mb: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
+            <Typography sx={{ 
+              color: 'rgba(255,255,255,0.7)', 
+              fontSize: {
+                xs: '0.7rem',    // Mobile
+                sm: '0.8rem',    // Tablet
+                md: '0.9rem'     // iPad Pro/Desktop
+              }
+            }}>Darts:</Typography>
+            <Typography sx={{ 
+              fontSize: {
+                xs: '0.7rem',
+                sm: '0.8rem',
+                md: '0.9rem'
+              }
+            }}>{dartsThrown}</Typography>
           </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-            <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Checkout:</Typography>
-            <Typography>{checkoutPercentage.toFixed(2)}%</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
+            <Typography sx={{ 
+              color: 'rgba(255,255,255,0.7)', 
+              fontSize: {
+                xs: '0.7rem',
+                sm: '0.8rem',
+                md: '0.9rem'
+              }
+            }}>Checkout:</Typography>
+            <Typography sx={{ 
+              fontSize: {
+                xs: '0.7rem',
+                sm: '0.8rem',
+                md: '0.9rem'
+              }
+            }}>
+              {successfulCheckouts}/{doubleAttempts} - {checkoutPercentage.toFixed(2)}%
+            </Typography>
           </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-            <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Double Attempts:</Typography>
-            <Typography>{doubleAttempts}</Typography>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Set:</Typography>
-              <Typography>{setsWon}</Typography>
+          
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              justifyContent: 'space-between',
+              mt: 2,
+              mb: 2,
+              py: 1.5,
+              borderTop: '2px solid rgba(255,255,255,0.15)',
+              borderBottom: '2px solid rgba(255,255,255,0.15)',
+              backgroundColor: 'rgba(255,255,255,0.02)'
+            }}
+          >
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+              <Typography 
+                sx={{ 
+                  color: 'rgba(255,255,255,0.9)',
+                  fontSize: {
+                    xs: '0.9rem',
+                    sm: '1.1rem',
+                    md: '1.3rem'
+                  },
+                  fontWeight: 600,
+                  mb: 0.5,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}
+              >
+                Set
+              </Typography>
+              <Typography 
+                sx={{ 
+                  fontSize: {
+                    xs: '1.8rem',
+                    sm: '2.2rem',
+                    md: '2.8rem'
+                  },
+                  fontWeight: 700,
+                  color: '#4caf50',
+                  textShadow: '0 0 10px rgba(76, 175, 80, 0.3)'
+                }}
+              >
+                {setsWon}
+              </Typography>
             </Box>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Leg:</Typography>
-              <Typography>{legsWon}</Typography>
+            <Box 
+              sx={{ 
+                width: '2px', 
+                bgcolor: 'rgba(255,255,255,0.15)',
+                mx: 2
+              }} 
+            />
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+              <Typography 
+                sx={{ 
+                  color: 'rgba(255,255,255,0.9)',
+                  fontSize: {
+                    xs: '0.9rem',
+                    sm: '1.1rem',
+                    md: '1.3rem'
+                  },
+                  fontWeight: 600,
+                  mb: 0.5,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em'
+                }}
+              >
+                Leg
+              </Typography>
+              <Typography 
+                sx={{ 
+                  fontSize: {
+                    xs: '1.8rem',
+                    sm: '2.2rem',
+                    md: '2.8rem'
+                  },
+                  fontWeight: 700,
+                  color: '#4caf50',
+                  textShadow: '0 0 10px rgba(76, 175, 80, 0.3)'
+                }}
+              >
+                {legsWon}
+              </Typography>
             </Box>
           </Box>
         </Box>
 
-        <Box sx={{ mb: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-            <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Game:</Typography>
-            <Typography>{average.toFixed(2)}</Typography>
+        <Box sx={{ mb: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
+            <Typography sx={{ 
+              color: 'rgba(255,255,255,0.7)', 
+              fontSize: {
+                xs: '0.7rem',
+                sm: '0.8rem',
+                md: '0.9rem'
+              }
+            }}>Game:</Typography>
+            <Typography sx={{ 
+              fontSize: {
+                xs: '0.7rem',
+                sm: '0.8rem',
+                md: '0.9rem'
+              }
+            }}>{average.toFixed(2)}</Typography>
           </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-            <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Set:</Typography>
-            <Typography>{setAverage.toFixed(2)}</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
+            <Typography sx={{ 
+              color: 'rgba(255,255,255,0.7)', 
+              fontSize: {
+                xs: '0.7rem',
+                sm: '0.8rem',
+                md: '0.9rem'
+              }
+            }}>Set:</Typography>
+            <Typography sx={{ 
+              fontSize: {
+                xs: '0.7rem',
+                sm: '0.8rem',
+                md: '0.9rem'
+              }
+            }}>{setAverage.toFixed(2)}</Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-            <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Leg:</Typography>
-            <Typography>{legAverage.toFixed(2)}</Typography>
+            <Typography sx={{ 
+              color: 'rgba(255,255,255,0.7)', 
+              fontSize: {
+                xs: '0.7rem',
+                sm: '0.8rem',
+                md: '0.9rem'
+              }
+            }}>Leg:</Typography>
+            <Typography sx={{ 
+              fontSize: {
+                xs: '0.7rem',
+                sm: '0.8rem',
+                md: '0.9rem'
+              }
+            }}>{legAverage.toFixed(2)}</Typography>
           </Box>
         </Box>
 
         <Box 
           sx={{ 
             mt: 'auto',
-            py: 1.5,
+            py: 1,
             display: 'flex',
             alignItems: 'center',
             gap: 2
           }}
         >
-          <Typography sx={{ color: 'rgba(255,255,255,0.7)' }}>Last score:</Typography>
-          <Typography>{latestScore}</Typography>
+          <Typography sx={{ 
+            color: 'rgba(255,255,255,0.7)', 
+            fontSize: {
+              xs: '0.7rem',
+              sm: '0.8rem',
+              md: '0.9rem'
+            }
+          }}>Last score:</Typography>
+          <Typography sx={{ 
+            fontSize: {
+              xs: '0.7rem',
+              sm: '0.8rem',
+              md: '0.9rem'
+            }
+          }}>{latestScore}</Typography>
           {checkoutThrows > 0 && (
-            <Typography sx={{ ml: 'auto', color: '#4caf50' }}>
+            <Typography sx={{ 
+              ml: 'auto', 
+              color: '#4caf50', 
+              fontSize: {
+                xs: '0.7rem',
+                sm: '0.8rem',
+                md: '0.9rem'
+              }
+            }}>
               {checkoutThrows} darts
             </Typography>
           )}

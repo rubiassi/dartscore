@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton, ListItemIcon, ListItemText, IconButton, useTheme, useMediaQuery } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton, ListItemIcon, ListItemText, IconButton, useTheme, useMediaQuery, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useGame } from '../../context/GameContext';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import SportsScoreIcon from '@mui/icons-material/SportsScore';
 import PersonIcon from '@mui/icons-material/Person';
@@ -13,12 +14,73 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import InfoIcon from '@mui/icons-material/Info';
 import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import BarChartIcon from '@mui/icons-material/BarChart';
 
 const drawerWidth = 240;
 
 interface NavigationLayoutProps {
   children: React.ReactNode;
 }
+
+// Dialog for game interruption
+interface GameInterruptDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onAbortGame: () => void;
+  onNewGame: () => void;
+}
+
+const GameInterruptDialog: React.FC<GameInterruptDialogProps> = ({
+  open,
+  onClose,
+  onAbortGame,
+  onNewGame
+}) => {
+  return (
+    <Dialog 
+      open={open} 
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          bgcolor: '#34495e',
+          color: 'white',
+          minWidth: 300
+        }
+      }}
+    >
+      <DialogTitle>Er du sikker på, at du vil afbryde spillet?</DialogTitle>
+      <DialogActions sx={{ flexDirection: 'column', gap: 1, p: 2 }}>
+        <Button 
+          fullWidth 
+          variant="contained" 
+          color="error" 
+          onClick={onAbortGame}
+          sx={{ color: 'white' }}
+        >
+          Afbryd spil
+        </Button>
+        <Button 
+          fullWidth 
+          variant="contained" 
+          color="primary" 
+          onClick={onNewGame}
+          sx={{ color: 'white' }}
+        >
+          Spil andet spil
+        </Button>
+        <Button 
+          fullWidth 
+          variant="outlined" 
+          onClick={onClose}
+          sx={{ color: 'white', borderColor: 'white' }}
+        >
+          Annuller
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
 
 const navigationItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
@@ -40,6 +102,22 @@ const NavigationLayout = ({ children }: NavigationLayoutProps) => {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [isOpen, setIsOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showGameInterruptDialog, setShowGameInterruptDialog] = useState(false);
+  const { showingStats, setShowingStats } = useGame();
+
+  // Check if we're in a game
+  const isInGame = location.pathname.includes('/x01game');
+  // Check if we're on dashboard
+  const isOnDashboard = location.pathname === '/dashboard';
+  // Store previous location for back navigation
+  const [previousLocation, setPreviousLocation] = useState<string>('/dashboard');
+
+  // Update previous location when location changes
+  useEffect(() => {
+    if (location.pathname !== previousLocation) {
+      setPreviousLocation(location.pathname);
+    }
+  }, [location]);
 
   const handleDrawerToggle = () => {
     if (isMobile) {
@@ -49,7 +127,34 @@ const NavigationLayout = ({ children }: NavigationLayoutProps) => {
     }
   };
 
+  const handleBack = () => {
+    if (isInGame) {
+      setShowGameInterruptDialog(true);
+    } else {
+      navigate(-1);
+    }
+  };
+
+  const handleAbortGame = () => {
+    setShowGameInterruptDialog(false);
+    navigate('/dashboard');
+  };
+
+  const handleNewGame = () => {
+    setShowGameInterruptDialog(false);
+    navigate('/local');
+  };
+
+  const handleStats = () => {
+    setShowingStats(true);
+  };
+
+  const handleBackToGame = () => {
+    setShowingStats(false);
+  };
+
   const getCurrentPageTitle = () => {
+    if (showingStats) return 'Statistik';
     const currentItem = navigationItems.find(item => item.path === location.pathname);
     return currentItem ? currentItem.text : 'DartScore';
   };
@@ -92,6 +197,14 @@ const NavigationLayout = ({ children }: NavigationLayoutProps) => {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+      {/* Game Interrupt Dialog */}
+      <GameInterruptDialog
+        open={showGameInterruptDialog}
+        onClose={() => setShowGameInterruptDialog(false)}
+        onAbortGame={handleAbortGame}
+        onNewGame={handleNewGame}
+      />
+
       {/* Top Bar */}
       <AppBar 
         position="fixed" 
@@ -102,25 +215,76 @@ const NavigationLayout = ({ children }: NavigationLayoutProps) => {
         }}
       >
         <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="toggle drawer"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2 }}
+          {!isOnDashboard ? (
+            <IconButton
+              color="inherit"
+              edge="start"
+              onClick={handleBack}
+              sx={{ mr: 2 }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+          ) : (
+            <IconButton
+              color="inherit"
+              edge="start"
+              onClick={handleDrawerToggle}
+              sx={{ mr: 2 }}
+            >
+              {isMobile ? <MenuIcon /> : (isOpen ? <ChevronLeftIcon /> : <MenuIcon />)}
+            </IconButton>
+          )}
+          
+          <Typography 
+            variant="h6" 
+            component="div" 
+            sx={{ 
+              flexGrow: 1,
+              textAlign: showingStats ? 'center' : 'left'
+            }}
           >
-            {isMobile ? <MenuIcon /> : (isOpen ? <ChevronLeftIcon /> : <MenuIcon />)}
-          </IconButton>
-          <Typography variant="h6" component="div">
             {getCurrentPageTitle()}
           </Typography>
-          <Box sx={{ flexGrow: 1 }} />
-          <IconButton
-            color="inherit"
-            onClick={() => navigate('/profile')}
-          >
-            <PersonIcon />
-          </IconButton>
+
+          {isInGame && showingStats && (
+            <IconButton
+              color="inherit"
+              onClick={handleBackToGame}
+              sx={{ 
+                bgcolor: 'rgba(255,255,255,0.1)',
+                '&:hover': {
+                  bgcolor: 'rgba(255,255,255,0.2)'
+                }
+              }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+          )}
+
+          {isInGame && !showingStats && (
+            <IconButton
+              color="inherit"
+              onClick={handleStats}
+              sx={{ 
+                ml: 'auto',
+                bgcolor: 'rgba(255,255,255,0.1)',
+                '&:hover': {
+                  bgcolor: 'rgba(255,255,255,0.2)'
+                }
+              }}
+            >
+              <BarChartIcon />
+            </IconButton>
+          )}
+
+          {!isInGame && (
+            <IconButton
+              color="inherit"
+              onClick={() => navigate('/profile')}
+            >
+              <PersonIcon />
+            </IconButton>
+          )}
         </Toolbar>
       </AppBar>
 
