@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { DndProvider, useDrag, useDrop } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 import {
   Box,
   Button,
@@ -26,8 +28,11 @@ import {
   DialogContent,
   DialogActions,
   Tooltip,
-  Divider
+  Card,
+  CardContent,
+  useTheme
 } from '@mui/material';
+import { styled } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import PersonIcon from '@mui/icons-material/Person';
 import GroupsIcon from '@mui/icons-material/Groups';
@@ -35,13 +40,15 @@ import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi';
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import LoginDialog from '../components/dialogs/LoginDialog';
 import GuestDialog from '../components/dialogs/GuestDialog';
 import BotDialog from '../components/dialogs/BotDialog';
 import FriendDialog from '../components/dialogs/FriendDialog';
 import { GameConfig } from '../types/game';
-import { DragDropContext, Droppable, Draggable, DropResult, DroppableProvided, DraggableProvided } from 'react-beautiful-dnd';
+import SettingsIcon from '@mui/icons-material/Settings';
 
 interface Player {
   id: string;
@@ -53,11 +60,381 @@ interface Player {
 
 type PlayerType = 'login' | 'guest' | 'bot' | 'friend';
 type MatchFormat = 'first' | 'best';
+type Position = 0 | 1 | 2 | 3;
+type SwapDirection = 'next' | 'previous' | 'across';
 
 const isBot = (type: PlayerType): type is 'bot' => type === 'bot';
 
+// Tilføj ItemTypes konstant
+const ItemTypes = {
+  PLAYER_CARD: 'playerCard'
+};
+
+interface PlayerCardProps {
+  player: Player;
+  index: number;
+  moveCard: (dragIndex: number, hoverIndex: number) => void;
+  onEdit: (index: number) => void;
+  onRemove: (index: number) => void;
+  isHome: boolean;
+  totalPlayers: number;
+  onPlayerTypeChange: (index: number, type: PlayerType) => void;
+}
+
+// PlayerCard komponent med drag and drop
+const PlayerCard: React.FC<PlayerCardProps> = ({ 
+  player, 
+  index, 
+  moveCard, 
+  onEdit, 
+  onRemove, 
+  isHome, 
+  totalPlayers,
+  onPlayerTypeChange 
+}) => {
+  const ref = useRef<HTMLDivElement>(null);
+  
+  const [{ isDragging }, drag] = useDrag(() => ({
+    type: ItemTypes.PLAYER_CARD,
+    item: { index },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging()
+    })
+  }), [index]);
+
+  const [, drop] = useDrop(() => ({
+    accept: ItemTypes.PLAYER_CARD,
+    hover: (item: { index: number }) => {
+      if (!ref.current) {
+        return;
+      }
+      
+      const dragIndex = item.index;
+      const hoverIndex = index;
+
+      // Don't replace items with themselves
+      if (dragIndex === hoverIndex) {
+        return;
+      }
+
+      moveCard(dragIndex, hoverIndex);
+      item.index = hoverIndex;
+    }
+  }), [index, moveCard]);
+
+  // Kombinér drag og drop refs
+  drag(drop(ref));
+
+  // Beregn card højde baseret på antal spillere (50% højere)
+  const cardHeight = totalPlayers <= 2 
+    ? { xs: '330px', sm: '375px', md: '420px' }  // 50% højere for 2 spillere
+    : { xs: '270px', sm: '300px', md: '330px' }; // 50% højere for 3-4 spillere
+
+  return (
+    <div ref={ref} style={{ opacity: isDragging ? 0.5 : 1 }}>
+      <Card 
+        sx={{ 
+          bgcolor: index === 0 ? 'rgba(0, 135, 90, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+          color: 'white',
+          borderRadius: 2,
+          transition: 'all 0.2s ease-in-out',
+          height: cardHeight,
+          cursor: 'move',
+          '&:hover': {
+            bgcolor: index === 0 ? 'rgba(0, 135, 90, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+          }
+        }}
+      >
+        <CardContent sx={{ 
+          height: '100%', 
+          display: 'flex', 
+          flexDirection: 'column',
+          p: { xs: 1, sm: 1.5, md: 2 },
+          '&:last-child': { pb: { xs: 1, sm: 1.5, md: 2 } }
+        }}>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center',
+            gap: { xs: 1, sm: 1.5 },
+            mb: { xs: 1, sm: 2 }
+          }}>
+            <Avatar 
+              sx={{ 
+                bgcolor: index === 0 ? '#00875A' : 'rgba(255, 255, 255, 0.1)',
+                width: { xs: 48, sm: 56 },
+                height: { xs: 48, sm: 56 }
+              }}
+            >
+              {player.name.charAt(0)}
+            </Avatar>
+            <Box sx={{ 
+              flex: 1,
+              minWidth: 0
+            }}>
+              <Box>
+                <Typography 
+                  component="span" 
+                  sx={{ 
+                    color: '#00875A',
+                    fontSize: '0.75rem',
+                    display: 'block'
+                  }}
+                >
+                  {index === 0 ? 'SPILLER 1' : index === 1 ? 'SPILLER 2' : `SPILLER ${index + 1}`}
+                </Typography>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    fontWeight: 500,
+                    fontSize: { xs: '1rem', sm: '1.25rem' },
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {player.name}
+                </Typography>
+                {player.type === 'login' && (
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      display: 'block',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    Rang: #123 • Kampe: 45 • Avg: 45.5
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 0.5 }}>
+              {player.type === 'guest' && (
+                <IconButton 
+                  size="small"
+                  onClick={() => onEdit(index)}
+                  sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
+                >
+                  <EditIcon fontSize="small" />
+                </IconButton>
+              )}
+              {totalPlayers > 1 && (
+                <IconButton 
+                  size="small"
+                  onClick={() => onRemove(index)}
+                  sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              )}
+            </Box>
+          </Box>
+
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            gap: 1,
+            mt: 'auto'
+          }}>
+            {player.type === 'login' ? (
+              <Box sx={{ 
+                display: 'flex', 
+                gap: 1, 
+                flexWrap: 'wrap',
+                mb: 1
+              }}>
+                <Box sx={{ 
+                  bgcolor: 'rgba(255, 255, 255, 0.05)', 
+                  p: { xs: 0.75, sm: 1 }, 
+                  borderRadius: 1,
+                  flex: '1 0 auto',
+                  minWidth: { xs: '45%', sm: 'auto' }
+                }}>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                    }}
+                  >
+                    Højeste checkout
+                  </Typography>
+                  <Typography 
+                    variant="h6" 
+                    sx={{ 
+                      color: '#00875A',
+                      fontSize: { xs: '1.1rem', sm: '1.25rem' }
+                    }}
+                  >
+                    167
+                  </Typography>
+                </Box>
+                <Box sx={{ 
+                  bgcolor: 'rgba(255, 255, 255, 0.05)', 
+                  p: { xs: 0.75, sm: 1 }, 
+                  borderRadius: 1,
+                  flex: '1 0 auto',
+                  minWidth: { xs: '45%', sm: 'auto' }
+                }}>
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      fontSize: { xs: '0.7rem', sm: '0.75rem' }
+                    }}
+                  >
+                    Bedste leg
+                  </Typography>
+                  <Typography 
+                    variant="h6" 
+                    sx={{ 
+                      color: '#00875A',
+                      fontSize: { xs: '1.1rem', sm: '1.25rem' }
+                    }}
+                  >
+                    15
+                  </Typography>
+                </Box>
+              </Box>
+            ) : (
+              <Box sx={{ flex: 1 }} />
+            )}
+            {index === 0 ? (
+              <>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => onPlayerTypeChange(index, 'login')}
+                  sx={{
+                    color: 'white',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    bgcolor: player.type === 'login' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                    '&:hover': {
+                      borderColor: 'rgba(255, 255, 255, 0.3)',
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    },
+                    textTransform: 'none'
+                  }}
+                >
+                  Log ind
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => onPlayerTypeChange(index, 'guest')}
+                  sx={{
+                    color: 'white',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    bgcolor: player.type === 'guest' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                    '&:hover': {
+                      borderColor: 'rgba(255, 255, 255, 0.3)',
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    },
+                    textTransform: 'none'
+                  }}
+                >
+                  Gæst
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => onPlayerTypeChange(index, player.type)}
+                sx={{
+                  color: 'white',
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                  '&:hover': {
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    bgcolor: 'rgba(255, 255, 255, 0.25)',
+                  },
+                  textTransform: 'none'
+                }}
+              >
+                {player.type === 'login' ? 'Log ind' :
+                 player.type === 'guest' ? 'Gæst' : ''}
+              </Button>
+            )}
+          </Box>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// Styled components
+const StyledPaper = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(3),
+  marginBottom: theme.spacing(2),
+  backgroundColor: theme.palette.background.paper,
+  color: theme.palette.text.primary,
+  borderRadius: theme.shape.borderRadius * 2,
+}));
+
+const StyledButton = styled(Button)(({ theme }) => ({
+  color: theme.palette.text.primary,
+  borderColor: theme.palette.divider,
+  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  '&:hover': {
+    borderColor: theme.palette.action.hover,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  textTransform: 'none',
+  padding: theme.spacing(1, 2),
+  gap: theme.spacing(1),
+}));
+
+const StyledSwitch = styled(Switch)(({ theme }) => ({
+  '& .MuiSwitch-switchBase.Mui-checked': {
+    color: theme.palette.primary.main,
+  },
+  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+    backgroundColor: theme.palette.primary.main,
+  },
+}));
+
+const StyledTextField = styled(TextField)(({ theme }) => ({
+  '& .MuiOutlinedInput-root': {
+    color: theme.palette.text.primary,
+    '& fieldset': {
+      borderColor: theme.palette.divider,
+    },
+    '&:hover fieldset': {
+      borderColor: theme.palette.action.hover,
+    },
+  },
+  '& .MuiInputLabel-root': {
+    color: theme.palette.text.secondary,
+  },
+}));
+
+const StyledToggleButtonGroup = styled(ToggleButtonGroup)(({ theme }) => ({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(4, 1fr)',
+  gap: theme.spacing(1),
+  width: '100%',
+  '& .MuiToggleButton-root': {
+    color: theme.palette.text.primary,
+    borderColor: theme.palette.divider,
+    '&.Mui-selected': {
+      backgroundColor: theme.palette.primary.dark,
+      color: theme.palette.primary.contrastText,
+      '&:hover': {
+        backgroundColor: theme.palette.primary.main,
+      },
+    },
+    '&:hover': {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
+  },
+}));
+
 const X01Setup = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
   
   // Player Settings
   const [players, setPlayers] = useState<Player[]>([
@@ -142,27 +519,38 @@ const X01Setup = () => {
 
   const handleAddGuest = (name: string, save: boolean) => {
     if (selectedPlayer !== null) {
-      const updatedPlayers = [...players];
-      updatedPlayers[selectedPlayer] = {
-        ...updatedPlayers[selectedPlayer],
+      const newPlayer = {
+        id: String(Date.now()),
         name,
-        type: 'guest'
+        type: 'guest' as PlayerType
       };
-      setPlayers(updatedPlayers);
+
+      setPlayers(currentPlayers => {
+        const newPlayers = [...currentPlayers];
+        // Hvis det er den anden spiller, indsæt i position 2
+        if (currentPlayers.length === 1) {
+          newPlayers[2] = newPlayer;
+        } else {
+          newPlayers[selectedPlayer] = newPlayer;
+        }
+        return newPlayers;
+      });
     }
     setGuestDialogOpen(false);
   };
 
   const handleSelectBot = (difficulty: string) => {
     if (selectedPlayer !== null) {
-      const updatedPlayers = [...players];
-      updatedPlayers[selectedPlayer] = {
-        ...updatedPlayers[selectedPlayer],
-        name: `Bot (${difficulty})`,
-        type: 'bot',
-        botDifficulty: difficulty
-      };
-      setPlayers(updatedPlayers);
+      setPlayers(currentPlayers => {
+        const newPlayers = [...currentPlayers];
+        newPlayers[selectedPlayer] = {
+          ...newPlayers[selectedPlayer],
+          name: `Bot (${difficulty})`,
+          type: 'bot',
+          botDifficulty: difficulty
+        };
+        return newPlayers;
+      });
     }
     setBotDialogOpen(false);
   };
@@ -175,7 +563,8 @@ const X01Setup = () => {
 
   const handlePlayerTypeSelect = (type: PlayerType) => {
     setPlayerTypeDialogOpen(false);
-    setSelectedPlayer(players.length);
+    // Hvis det er den anden spiller, sæt selectedPlayer til position 2 (højre kolonne)
+    setSelectedPlayer(players.length === 1 ? 2 : players.length);
     switch (type) {
       case 'login':
         setLoginDialogOpen(true);
@@ -193,8 +582,7 @@ const X01Setup = () => {
   };
 
   const handleRemovePlayer = (index: number) => {
-    const updatedPlayers = players.filter((_, i) => i !== index);
-    setPlayers(updatedPlayers);
+    setPlayers(currentPlayers => currentPlayers.filter((_, i) => i !== index));
   };
 
   const getRequiredWins = () => {
@@ -241,15 +629,20 @@ const X01Setup = () => {
     navigate('/x01game', { state: gameConfig });
   };
 
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
-
-    const reorderedPlayers = Array.from(players);
-    const [removed] = reorderedPlayers.splice(result.source.index, 1);
-    reorderedPlayers.splice(result.destination.index, 0, removed);
-
-    // Opdater spillerlisten med de nye positioner
-    setPlayers(reorderedPlayers);
+  const moveCard = (dragIndex: number, hoverIndex: number) => {
+    const newPlayers = [...players];
+    const draggedPlayer = newPlayers[dragIndex];
+    
+    // Hvis det er den anden spiller der tilføjes, placer den i højre kolonne
+    if (newPlayers.length === 2 && dragIndex === 1) {
+      newPlayers.splice(dragIndex, 1);
+      newPlayers.splice(2, 0, draggedPlayer);
+    } else {
+      newPlayers.splice(dragIndex, 1);
+      newPlayers.splice(hoverIndex, 0, draggedPlayer);
+    }
+    
+    setPlayers(newPlayers);
   };
 
   const handleEditPlayer = (index: number) => {
@@ -261,334 +654,166 @@ const X01Setup = () => {
 
   const handleSavePlayerName = () => {
     if (editingPlayer) {
-      const updatedPlayers = [...players];
-      updatedPlayers[editingPlayer.index] = {
-        ...updatedPlayers[editingPlayer.index],
-        name: editingPlayer.name
-      };
-      setPlayers(updatedPlayers);
+      setPlayers(currentPlayers => {
+        const newPlayers = [...currentPlayers];
+        newPlayers[editingPlayer.index] = {
+          ...newPlayers[editingPlayer.index],
+          name: editingPlayer.name
+        };
+        return newPlayers;
+      });
       setEditingPlayer(null);
     }
   };
 
   return (
     <Box sx={{ 
-      bgcolor: '#1a1f2e', 
-      minHeight: '100vh', 
+      bgcolor: theme.palette.background.default,
+      minHeight: '100vh',
       p: 2,
-      color: 'white'
+      color: theme.palette.text.primary
     }}>
       <Container maxWidth="md">
-        {/* Players Section */}
-        <Paper 
-          sx={{ 
-            p: 3, 
-            mb: 2, 
-            bgcolor: 'rgba(255, 255, 255, 0.05)',
-            color: 'white',
-            borderRadius: 2
-          }}
-        >
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="players-list" direction="horizontal">
-              {(provided: DroppableProvided) => (
-                <Box
-                  {...provided.droppableProps}
-                  ref={provided.innerRef}
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 2,
-                    transition: 'background-color 0.2s ease',
-                    minHeight: players.length === 0 ? '100px' : 'auto',
-                  }}
-                >
-                  {players.map((player, index) => (
-                    <Draggable 
-                      key={player.id} 
-                      draggableId={player.id} 
-                      index={index}
-                    >
-                      {(provided: DraggableProvided, snapshot) => (
-                        <>
-                          <Box 
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            sx={{ 
-                              flex: 1,
-                              minWidth: '200px',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              bgcolor: index === 0 ? 'rgba(0, 135, 90, 0.1)' : 'transparent',
-                              p: 2,
-                              borderRadius: 2,
-                              transition: 'all 0.2s ease-in-out',
-                              transform: snapshot.isDragging ? 'scale(1.02)' : 'scale(1)',
-                              '&:hover': {
-                                bgcolor: 'rgba(255, 255, 255, 0.05)',
-                              },
-                              '&:active': {
-                                bgcolor: 'rgba(255, 255, 255, 0.1)',
-                              }
-                            }}
-                          >
-                            <Box sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center',
-                              gap: 1,
-                              mb: 2
-                            }}>
-                              <Avatar sx={{ bgcolor: index === 0 ? '#00875A' : 'rgba(255, 255, 255, 0.1)' }}>
-                                {player.name.charAt(0)}
-                              </Avatar>
-                              <Box sx={{ flex: 1 }}>
-                                <Typography>
-                                  {index === 0 && (
-                                    <Typography 
-                                      component="span" 
-                                      sx={{ 
-                                        color: '#00875A',
-                                        fontSize: '0.75rem',
-                                        display: 'block'
-                                      }}
-                                    >
-                                      STARTER
-                                    </Typography>
-                                  )}
-                                  {player.name}
-                                </Typography>
-                              </Box>
-                              {player.type === 'guest' && (
-                                <IconButton 
-                                  size="small"
-                                  onClick={() => handleEditPlayer(index)}
-                                  sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
-                                >
-                                  <EditIcon fontSize="small" />
-                                </IconButton>
-                              )}
-                              {players.length > 1 && (
-                                <IconButton 
-                                  size="small"
-                                  onClick={() => handleRemovePlayer(index)}
-                                  sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
-                                >
-                                  <CloseIcon fontSize="small" />
-                                </IconButton>
-                              )}
-                            </Box>
-
-                            <Box sx={{ 
-                              display: 'flex', 
-                              flexDirection: 'column',
-                              gap: 1
-                            }}>
-                              {index === 0 ? (
-                                // Første spiller viser alle knapper
-                                <>
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={() => handlePlayerTypeChange(index, 'login')}
-                                    sx={{
-                                      color: 'white',
-                                      borderColor: 'rgba(255, 255, 255, 0.2)',
-                                      bgcolor: player.type === 'login' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                                      '&:hover': {
-                                        borderColor: 'rgba(255, 255, 255, 0.3)',
-                                        bgcolor: 'rgba(255, 255, 255, 0.1)',
-                                      },
-                                      textTransform: 'none'
-                                    }}
-                                  >
-                                    Log ind
-                                  </Button>
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={() => handlePlayerTypeChange(index, 'guest')}
-                                    sx={{
-                                      color: 'white',
-                                      borderColor: 'rgba(255, 255, 255, 0.2)',
-                                      bgcolor: player.type === 'guest' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                                      '&:hover': {
-                                        borderColor: 'rgba(255, 255, 255, 0.3)',
-                                        bgcolor: 'rgba(255, 255, 255, 0.1)',
-                                      },
-                                      textTransform: 'none'
-                                    }}
-                                  >
-                                    Gæst
-                                  </Button>
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={() => handlePlayerTypeChange(index, 'bot')}
-                                    sx={{
-                                      color: 'white',
-                                      borderColor: 'rgba(255, 255, 255, 0.2)',
-                                      bgcolor: player.type === 'bot' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                                      '&:hover': {
-                                        borderColor: 'rgba(255, 255, 255, 0.3)',
-                                        bgcolor: 'rgba(255, 255, 255, 0.1)',
-                                      },
-                                      textTransform: 'none'
-                                    }}
-                                  >
-                                    Bot
-                                  </Button>
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={() => handlePlayerTypeChange(index, 'friend')}
-                                    sx={{
-                                      color: 'white',
-                                      borderColor: 'rgba(255, 255, 255, 0.2)',
-                                      bgcolor: player.type === 'friend' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                                      '&:hover': {
-                                        borderColor: 'rgba(255, 255, 255, 0.3)',
-                                        bgcolor: 'rgba(255, 255, 255, 0.1)',
-                                      },
-                                      textTransform: 'none'
-                                    }}
-                                  >
-                                    Ven
-                                  </Button>
-                                </>
-                              ) : (
-                                // Andre spillere viser kun deres valgte type
-                                isBot(player.type) ? (
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={() => handlePlayerTypeChange(index, 'bot')}
-                                    sx={{
-                                      color: 'white',
-                                      borderColor: 'rgba(255, 255, 255, 0.2)',
-                                      bgcolor: 'rgba(255, 255, 255, 0.2)',
-                                      '&:hover': {
-                                        borderColor: 'rgba(255, 255, 255, 0.3)',
-                                        bgcolor: 'rgba(255, 255, 255, 0.25)',
-                                      },
-                                      textTransform: 'none'
-                                    }}
-                                  >
-                                    Niveau
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={() => handlePlayerTypeChange(index, player.type)}
-                                    sx={{
-                                      color: 'white',
-                                      borderColor: 'rgba(255, 255, 255, 0.2)',
-                                      bgcolor: 'rgba(255, 255, 255, 0.2)',
-                                      '&:hover': {
-                                        borderColor: 'rgba(255, 255, 255, 0.3)',
-                                        bgcolor: 'rgba(255, 255, 255, 0.25)',
-                                      },
-                                      textTransform: 'none'
-                                    }}
-                                  >
-                                    {player.type === 'login' ? 'Log ind' :
-                                     player.type === 'guest' ? 'Gæst' :
-                                     player.type === 'friend' ? 'Ven' : ''}
-                                  </Button>
-                                )
-                              )}
-                            </Box>
-                          </Box>
-                          {index < players.length - 1 && (
-                            <Box 
-                              sx={{ 
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                width: '60px',
-                                height: '60px',
-                                borderRadius: '50%',
-                                bgcolor: 'rgba(255, 255, 255, 0.05)',
-                                color: '#00875A'
-                              }}
-                            >
-                              <SportsKabaddiIcon sx={{ fontSize: 32 }} />
-                            </Box>
-                          )}
-                        </>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
-                </Box>
-              )}
-            </Droppable>
-          </DragDropContext>
-
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            mt: 2
-          }}>
-            {players.length < 4 && (
-              <Tooltip title="Tilføj spiller" arrow>
-                <Button
-                  onClick={handleAddPlayer}
-                  startIcon={<PersonAddIcon />}
-                  sx={{
-                    color: 'white',
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                    bgcolor: 'rgba(255, 255, 255, 0.05)',
-                    '&:hover': {
-                      borderColor: 'rgba(255, 255, 255, 0.3)',
-                      bgcolor: 'rgba(255, 255, 255, 0.1)',
-                    },
-                    textTransform: 'none',
-                    px: 2,
-                    py: 1,
-                    gap: 1
-                  }}
-                >
-                  Tilføj spiller
-                </Button>
-              </Tooltip>
-            )}
+        <DndProvider backend={HTML5Backend}>
+          <StyledPaper>
+            {/* Header sektion */}
             <Box sx={{ 
               display: 'flex', 
+              justifyContent: 'space-between', 
               alignItems: 'center',
-              gap: 2,
-              ml: 'auto'
+              mb: 2
             }}>
-              <Typography>Random player start</Typography>
-              <Switch 
-                checked={randomStart}
-                onChange={(e) => setRandomStart(e.target.checked)}
-                sx={{
-                  '& .MuiSwitch-switchBase.Mui-checked': {
-                    color: '#00875A',
-                  },
-                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                    backgroundColor: '#00875A',
-                  },
-                }}
-              />
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <SettingsIcon sx={{ color: theme.palette.primary.main }} />
+                <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                  Spilleropsætning
+                </Typography>
+              </Box>
+              
+              {players.length < 4 && (
+                <Tooltip title="Tilføj spiller" arrow>
+                  <StyledButton
+                    onClick={handleAddPlayer}
+                    startIcon={<PersonAddIcon />}
+                  >
+                    Tilføj spiller
+                  </StyledButton>
+                </Tooltip>
+              )}
             </Box>
-          </Box>
-        </Paper>
+
+            <Box sx={{ 
+              display: 'flex',
+              gap: { xs: 1, sm: 1.5, md: 2 },
+              height: '100%',
+              minHeight: { xs: '320px', sm: '360px' },
+              mx: 'auto',
+              maxWidth: '100%',
+              pt: 5
+            }}>
+              {/* Venstre kolonne */}
+              <Box sx={{ 
+                flex: '1 1 0',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: { xs: 1, sm: 1.5, md: 2 },
+                height: '100%',
+                justifyContent: 'center',
+                minWidth: 0 // Vigtigt for at forhindre overflow
+              }}>
+                {players.slice(0, 1).map((player, index) => (
+                  <PlayerCard
+                    key={player.id}
+                    player={player}
+                    index={index}
+                    moveCard={moveCard}
+                    onEdit={handleEditPlayer}
+                    onRemove={handleRemovePlayer}
+                    isHome={true}
+                    totalPlayers={players.length}
+                    onPlayerTypeChange={handlePlayerTypeChange}
+                  />
+                ))}
+              </Box>
+
+              {/* Midter kolonne */}
+              <Box sx={{ 
+                flex: '0 0 auto',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                px: { xs: 1, sm: 2 }
+              }}>
+                <Box 
+                  sx={{ 
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: { xs: '50px', sm: '60px', md: '80px' },
+                    height: { xs: '50px', sm: '60px', md: '80px' },
+                    borderRadius: '50%',
+                    bgcolor: 'rgba(255, 255, 255, 0.05)',
+                    color: '#00875A'
+                  }}
+                >
+                  <SportsKabaddiIcon sx={{ fontSize: { xs: 24, sm: 30, md: 40 } }} />
+                </Box>
+              </Box>
+
+              {/* Højre kolonne */}
+              <Box sx={{ 
+                flex: '1 1 0',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: { xs: 1, sm: 1.5, md: 2 },
+                height: '100%',
+                justifyContent: 'center',
+                minWidth: 0 // Vigtigt for at forhindre overflow
+              }}>
+                {players.slice(1).map((player, index) => (
+                  <PlayerCard
+                    key={player.id}
+                    player={player}
+                    index={index + 1}
+                    moveCard={moveCard}
+                    onEdit={(i) => handleEditPlayer(i + 1)}
+                    onRemove={(i) => handleRemovePlayer(i + 1)}
+                    isHome={false}
+                    totalPlayers={players.length}
+                    onPlayerTypeChange={handlePlayerTypeChange}
+                  />
+                ))}
+              </Box>
+            </Box>
+
+            {players.length < 4 && (
+              <Box sx={{ 
+                display: 'flex', 
+                justifyContent: 'flex-end', 
+                alignItems: 'center', 
+                mt: { xs: 1, sm: 2 },
+                gap: 2
+              }}>
+                <Typography>Random player start</Typography>
+                <Switch 
+                  checked={randomStart}
+                  onChange={(e) => setRandomStart(e.target.checked)}
+                  sx={{
+                    '& .MuiSwitch-switchBase.Mui-checked': {
+                      color: '#00875A',
+                    },
+                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                      backgroundColor: '#00875A',
+                    },
+                  }}
+                />
+              </Box>
+            )}
+          </StyledPaper>
+        </DndProvider>
 
         {/* Game Settings */}
-        <Paper 
-          sx={{ 
-            p: 3, 
-            mb: 2, 
-            bgcolor: 'rgba(255, 255, 255, 0.05)',
-            color: 'white',
-            borderRadius: 2
-          }}
-        >
+        <StyledPaper>
           <Box sx={{ 
             display: 'flex', 
             alignItems: 'center', 
@@ -798,18 +1023,10 @@ const X01Setup = () => {
               </Typography>
             </Box>
           </Box>
-        </Paper>
+        </StyledPaper>
 
         {/* Game Options */}
-        <Paper 
-          sx={{ 
-            p: 3, 
-            mb: 2, 
-            bgcolor: 'rgba(255, 255, 255, 0.05)',
-            color: 'white',
-            borderRadius: 2
-          }}
-        >
+        <StyledPaper>
           <Box sx={{ 
             display: 'flex', 
             alignItems: 'center', 
@@ -839,7 +1056,7 @@ const X01Setup = () => {
               onChange={(e) => setIsTraining(e.target.checked)}
             />
           </Box>
-        </Paper>
+        </StyledPaper>
 
         {/* Start Game Button */}
         <Button
@@ -848,11 +1065,11 @@ const X01Setup = () => {
           onClick={handleStartGame}
           sx={{
             py: 2,
-            bgcolor: '#00875A',
+            bgcolor: theme.palette.primary.main,
             '&:hover': {
-              bgcolor: '#007A51',
+              bgcolor: theme.palette.primary.dark,
             },
-            borderRadius: 2,
+            borderRadius: theme.shape.borderRadius * 2,
             textTransform: 'none',
             fontSize: '1rem'
           }}
@@ -866,14 +1083,14 @@ const X01Setup = () => {
           onClose={() => setEditingPlayer(null)}
           PaperProps={{
             sx: {
-              bgcolor: '#1a1f2e',
-              color: 'white',
+              bgcolor: theme.palette.background.paper,
+              color: theme.palette.text.primary,
             }
           }}
         >
           <DialogTitle>Edit Player Name</DialogTitle>
           <DialogContent>
-            <TextField
+            <StyledTextField
               autoFocus
               margin="dense"
               label="Player Name"
@@ -881,27 +1098,13 @@ const X01Setup = () => {
               fullWidth
               value={editingPlayer?.name || ''}
               onChange={(e) => setEditingPlayer(prev => prev ? {...prev, name: e.target.value} : null)}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  color: 'white',
-                  '& fieldset': {
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                  },
-                  '&:hover fieldset': {
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                  },
-                },
-                '& .MuiInputLabel-root': {
-                  color: 'rgba(255, 255, 255, 0.7)',
-                },
-              }}
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setEditingPlayer(null)} sx={{ color: 'white' }}>
+            <Button onClick={() => setEditingPlayer(null)} sx={{ color: theme.palette.text.primary }}>
               Cancel
             </Button>
-            <Button onClick={handleSavePlayerName} sx={{ color: '#00875A' }}>
+            <Button onClick={handleSavePlayerName} sx={{ color: theme.palette.primary.main }}>
               Save
             </Button>
           </DialogActions>
@@ -913,8 +1116,8 @@ const X01Setup = () => {
           onClose={() => setPlayerTypeDialogOpen(false)}
           PaperProps={{
             sx: {
-              bgcolor: '#1a1f2e',
-              color: 'white',
+              bgcolor: theme.palette.background.paper,
+              color: theme.palette.text.primary,
               minWidth: '300px'
             }
           }}
@@ -999,8 +1202,8 @@ const X01Setup = () => {
           onClose={() => setStartingScoreDialogOpen(false)}
           PaperProps={{
             sx: {
-              bgcolor: '#1a1f2e',
-              color: 'white',
+              bgcolor: theme.palette.background.paper,
+              color: theme.palette.text.primary,
               minWidth: '300px'
             }
           }}
@@ -1081,8 +1284,8 @@ const X01Setup = () => {
           onClose={() => setMatchFormatDialogOpen(false)}
           PaperProps={{
             sx: {
-              bgcolor: '#1a1f2e',
-              color: 'white',
+              bgcolor: theme.palette.background.paper,
+              color: theme.palette.text.primary,
               minWidth: '300px'
             }
           }}
@@ -1197,8 +1400,8 @@ const X01Setup = () => {
           onClose={() => setSetsDialogOpen(false)}
           PaperProps={{
             sx: {
-              bgcolor: '#1a1f2e',
-              color: 'white',
+              bgcolor: theme.palette.background.paper,
+              color: theme.palette.text.primary,
               minWidth: '300px'
             }
           }}
@@ -1255,8 +1458,8 @@ const X01Setup = () => {
           onClose={() => setLegsDialogOpen(false)}
           PaperProps={{
             sx: {
-              bgcolor: '#1a1f2e',
-              color: 'white',
+              bgcolor: theme.palette.background.paper,
+              color: theme.palette.text.primary,
               minWidth: '300px'
             }
           }}
@@ -1313,8 +1516,8 @@ const X01Setup = () => {
           onClose={() => setStartingInDialogOpen(false)}
           PaperProps={{
             sx: {
-              bgcolor: '#1a1f2e',
-              color: 'white',
+              bgcolor: theme.palette.background.paper,
+              color: theme.palette.text.primary,
               minWidth: '300px'
             }
           }}
@@ -1429,8 +1632,8 @@ const X01Setup = () => {
           onClose={() => setOutRulesDialogOpen(false)}
           PaperProps={{
             sx: {
-              bgcolor: '#1a1f2e',
-              color: 'white',
+              bgcolor: theme.palette.background.paper,
+              color: theme.palette.text.primary,
               minWidth: '300px'
             }
           }}

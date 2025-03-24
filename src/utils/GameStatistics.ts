@@ -1,110 +1,155 @@
-// Interfaces
-interface ThrowHistory {
-  score: number;
-  dartsUsed: number;
-  doublesAttempted: number;
-  isCheckout: boolean;
-}
+import { memoize } from './memoization';
+import { PlayerGameData, ThrowHistory } from '../types/statistics';
 
-interface PlayerGameData {
-  throwHistory: ThrowHistory[];
-  legsWon: number[];  // Array af antal darts brugt til at vinde hver leg
-  setsWon: number;
-}
-
-// Statistikberegninger
-export const calculateOverallAverage = (gameData: PlayerGameData): number => {
-  const totalScore = gameData.throwHistory.reduce((sum, t) => sum + t.score, 0);
-  const totalDarts = gameData.throwHistory.reduce((sum, t) => sum + t.dartsUsed, 0);
-  return totalDarts > 0 ? (totalScore * 3) / totalDarts : 0;
+// Hjælpefunktioner til at reducere gentagne beregninger
+const calculateTotals = (throws: ThrowHistory[]) => {
+  return throws.reduce(
+    (acc, t) => ({
+      score: acc.score + t.score,
+      darts: acc.darts + t.dartsUsed
+    }),
+    { score: 0, darts: 0 }
+  );
 };
 
-export const calculateLegAverage = (gameData: PlayerGameData, currentLeg: ThrowHistory[]): number => {
-  const totalScore = currentLeg.reduce((sum, t) => sum + t.score, 0);
-  const totalDarts = currentLeg.reduce((sum, t) => sum + t.dartsUsed, 0);
-  return totalDarts > 0 ? (totalScore * 3) / totalDarts : 0;
+// Base implementations
+const calculateOverallAverageImpl = (gameData: PlayerGameData): number => {
+  if (!gameData?.throwHistory?.length) return 0;
+  const { score, darts } = calculateTotals(gameData.throwHistory);
+  return darts > 0 ? (score * 3) / darts : 0;
 };
 
-export const calculateSetAverage = (gameData: PlayerGameData, currentSet: ThrowHistory[]): number => {
-  const totalScore = currentSet.reduce((sum, t) => sum + t.score, 0);
-  const totalDarts = currentSet.reduce((sum, t) => sum + t.dartsUsed, 0);
-  return totalDarts > 0 ? (totalScore * 3) / totalDarts : 0;
+const calculateLegAverageImpl = (gameData: PlayerGameData, currentLeg: ThrowHistory[]): number => {
+  if (!currentLeg?.length) return 0;
+  const { score, darts } = calculateTotals(currentLeg);
+  return darts > 0 ? (score * 3) / darts : 0;
 };
 
-export const calculateFirstNineAverage = (gameData: PlayerGameData): number => {
+const calculateSetAverageImpl = (gameData: PlayerGameData, currentSet: ThrowHistory[]): number => {
+  if (!currentSet?.length) return 0;
+  const { score, darts } = calculateTotals(currentSet);
+  return darts > 0 ? (score * 3) / darts : 0;
+};
+
+const calculateFirstNineAverageImpl = (gameData: PlayerGameData): number => {
+  if (!gameData?.throwHistory?.length) return 0;
   const firstNine = gameData.throwHistory.slice(0, 3);
-  const totalScore = firstNine.reduce((sum, t) => sum + t.score, 0);
-  const totalDarts = firstNine.reduce((sum, t) => sum + t.dartsUsed, 0);
-  return totalDarts > 0 ? (totalScore * 3) / totalDarts : 0;
+  const { score, darts } = calculateTotals(firstNine);
+  return darts > 0 ? (score * 3) / darts : 0;
 };
 
-export const calculateCheckoutPercentage = (gameData: PlayerGameData): number => {
-  // Tæl antal succesfulde checkouts (hits)
-  const successfulCheckouts = gameData.throwHistory.filter(t => t.isCheckout && t.score > 0).length;
+// Optimeret checkout beregning
+const calculateCheckoutStats = (gameData: PlayerGameData) => {
+  if (!gameData?.throwHistory?.length) return { successful: 0, attempts: 0 };
   
-  // Tæl total antal double-forsøg (både fra checkouts og ikke-checkouts)
-  const totalAttempts = gameData.throwHistory.reduce((sum, t) => {
-    // Hvis det er en succesfuld checkout, tæl mindst 1 attempt
+  return gameData.throwHistory.reduce((acc, t) => {
     if (t.isCheckout && t.score > 0) {
-      return sum + Math.max(1, t.doublesAttempted);
+      return {
+        successful: acc.successful + 1,
+        attempts: acc.attempts + Math.max(1, t.doublesAttempted)
+      };
     }
-    // For alle andre kast, tæl doublesAttempted
-    return sum + t.doublesAttempted;
-  }, 0);
-
-  return totalAttempts > 0 ? (successfulCheckouts / totalAttempts) * 100 : 0;
+    return {
+      successful: acc.successful,
+      attempts: acc.attempts + t.doublesAttempted
+    };
+  }, { successful: 0, attempts: 0 });
 };
 
-export const getSuccessfulCheckouts = (gameData: PlayerGameData): number => {
-  return gameData.throwHistory.filter(t => t.isCheckout && t.score > 0).length;
+const calculateCheckoutPercentageImpl = (gameData: PlayerGameData): number => {
+  const stats = calculateCheckoutStats(gameData);
+  return stats.attempts > 0 ? (stats.successful / stats.attempts) * 100 : 0;
 };
 
-export const getCheckoutAttempts = (gameData: PlayerGameData): number => {
-  // Tæl total antal double-forsøg (både fra checkouts og ikke-checkouts)
-  return gameData.throwHistory.reduce((sum, t) => {
-    // Hvis det er en succesfuld checkout, tæl mindst 1 attempt
-    if (t.isCheckout && t.score > 0) {
-      return sum + Math.max(1, t.doublesAttempted);
-    }
-    // For alle andre kast, tæl doublesAttempted
-    return sum + t.doublesAttempted;
-  }, 0);
+const getSuccessfulCheckoutsImpl = (gameData: PlayerGameData): number => {
+  return calculateCheckoutStats(gameData).successful;
 };
 
-export const getLegsWonByDarts = (gameData: PlayerGameData, darts: number): number => {
-  return gameData.legsWon.filter(d => d === darts).length;
+const getCheckoutAttemptsImpl = (gameData: PlayerGameData): number => {
+  return calculateCheckoutStats(gameData).attempts;
 };
 
-export const getLegsWonByDartsRange = (gameData: PlayerGameData, min: number, max: number): number => {
-  return gameData.legsWon.filter(d => d >= min && d <= max).length;
+// Optimeret legs won beregning
+const calculateLegsWonStats = memoize((gameData: PlayerGameData) => {
+  if (!gameData?.legsWon?.length) return new Map<number, number>();
+  
+  return gameData.legsWon.reduce((acc, darts) => {
+    acc.set(darts, (acc.get(darts) || 0) + 1);
+    return acc;
+  }, new Map<number, number>());
+});
+
+const getLegsWonByDartsImpl = (gameData: PlayerGameData, darts: number): number => {
+  const stats = calculateLegsWonStats(gameData);
+  return stats.get(darts) || 0;
 };
 
-export const getLegsWonByDartsOver = (gameData: PlayerGameData, darts: number): number => {
-  return gameData.legsWon.filter(d => d > darts).length;
+const getLegsWonByDartsRangeImpl = (gameData: PlayerGameData, min: number, max: number): number => {
+  const stats = calculateLegsWonStats(gameData);
+  return Array.from(stats.entries())
+    .filter(([darts]) => darts >= min && darts <= max)
+    .reduce((sum, [_, count]) => sum + count, 0);
 };
 
-export const getScoringCount = (gameData: PlayerGameData, score: number): number => {
-  return gameData.throwHistory.filter(t => t.score === score).length;
+const getLegsWonByDartsOverImpl = (gameData: PlayerGameData, darts: number): number => {
+  const stats = calculateLegsWonStats(gameData);
+  return Array.from(stats.entries())
+    .filter(([d]) => d > darts)
+    .reduce((sum, [_, count]) => sum + count, 0);
 };
 
-export const getScoringRangeCount = (gameData: PlayerGameData, min: number, max: number): number => {
-  return gameData.throwHistory.filter(t => t.score >= min && t.score <= max).length;
+// Optimeret scoring beregning
+const calculateScoringStats = memoize((gameData: PlayerGameData) => {
+  if (!gameData?.throwHistory?.length) return new Map<number, number>();
+  
+  return gameData.throwHistory.reduce((acc, t) => {
+    acc.set(t.score, (acc.get(t.score) || 0) + 1);
+    return acc;
+  }, new Map<number, number>());
+});
+
+const getScoringCountImpl = (gameData: PlayerGameData, score: number): number => {
+  const stats = calculateScoringStats(gameData);
+  return stats.get(score) || 0;
 };
 
-// Beregn total antal darts brugt i hele spillet
-export const calculateTotalDartsThrown = (gameData: PlayerGameData): number => {
+const getScoringRangeCountImpl = (gameData: PlayerGameData, min: number, max: number): number => {
+  const stats = calculateScoringStats(gameData);
+  return Array.from(stats.entries())
+    .filter(([score]) => score >= min && score <= max)
+    .reduce((sum, [_, count]) => sum + count, 0);
+};
+
+const calculateTotalDartsThrownImpl = (gameData: PlayerGameData): number => {
+  if (!gameData?.throwHistory?.length) return 0;
   return gameData.throwHistory.reduce((sum, t) => sum + t.dartsUsed, 0);
 };
 
-// Find højeste checkout score
-export const calculateHighestFinish = (gameData: PlayerGameData): number => {
-  const checkoutScores = gameData.throwHistory
-    .filter(t => t.isCheckout && t.score > 0)
-    .map(t => t.score);
-  
-  // Hvis der er checkouts, returner den højeste, ellers 0
-  return checkoutScores.length > 0 ? Math.max(...checkoutScores) : 0;
+const calculateHighestFinishImpl = (gameData: PlayerGameData): number => {
+  if (!gameData?.throwHistory?.length) return 0;
+  return Math.max(
+    0,
+    ...gameData.throwHistory
+      .filter(t => t.isCheckout && t.score > 0)
+      .map(t => t.score)
+  );
 };
+
+// Memoized exports
+export const calculateOverallAverage = memoize(calculateOverallAverageImpl);
+export const calculateLegAverage = memoize(calculateLegAverageImpl);
+export const calculateSetAverage = memoize(calculateSetAverageImpl);
+export const calculateFirstNineAverage = memoize(calculateFirstNineAverageImpl);
+export const calculateCheckoutPercentage = memoize(calculateCheckoutPercentageImpl);
+export const getSuccessfulCheckouts = memoize(getSuccessfulCheckoutsImpl);
+export const getCheckoutAttempts = memoize(getCheckoutAttemptsImpl);
+export const getLegsWonByDarts = memoize(getLegsWonByDartsImpl);
+export const getLegsWonByDartsRange = memoize(getLegsWonByDartsRangeImpl);
+export const getLegsWonByDartsOver = memoize(getLegsWonByDartsOverImpl);
+export const getScoringCount = memoize(getScoringCountImpl);
+export const getScoringRangeCount = memoize(getScoringRangeCountImpl);
+export const calculateTotalDartsThrown = memoize(calculateTotalDartsThrownImpl);
+export const calculateHighestFinish = memoize(calculateHighestFinishImpl);
 
 export default {
   calculateOverallAverage,

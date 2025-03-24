@@ -183,8 +183,23 @@ class CheckoutValidator {
       };
     }
 
+    // Tjek om den resterende score er en mulig double (2-40 med lige tal, eller 50)
+    const isDoubleScore = (remainingScore <= 40 && remainingScore % 2 === 0) || remainingScore === 50;
+
     // Tjek om den resterende score har en gyldig checkout route
     const checkout = this.CHECKOUTS[remainingScore];
+
+    // Hvis scoren er under 40, skal vi tjekke om den er lige/ulige
+    if (remainingScore <= 40) {
+      return {
+        isPossible: true,
+        minimumDarts: remainingScore % 2 === 0 ? 1 : 2,
+        possibleDoubleAttempt: true,
+        checkoutRoute: checkout?.route
+      };
+    }
+
+    // For scores over 40, tjek om det er en gyldig checkout route
     if (checkout) {
       return {
         isPossible: true,

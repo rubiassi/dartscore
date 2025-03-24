@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton, ListItemIcon, ListItemText, IconButton, useTheme, useMediaQuery, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
+import { Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton, ListItemIcon, ListItemText, IconButton, useTheme, useMediaQuery, Dialog, DialogTitle, DialogContent, DialogActions, Button, DrawerProps, CssBaseline } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useGame } from '../../context/GameContext';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -16,71 +16,136 @@ import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import { styled } from '@mui/material/styles';
+import { Theme } from '@mui/material/styles';
 
 const drawerWidth = 240;
 
-interface NavigationLayoutProps {
-  children: React.ReactNode;
-}
-
-// Dialog for game interruption
-interface GameInterruptDialogProps {
-  open: boolean;
-  onClose: () => void;
-  onAbortGame: () => void;
-  onNewGame: () => void;
-}
-
-const GameInterruptDialog: React.FC<GameInterruptDialogProps> = ({
-  open,
-  onClose,
-  onAbortGame,
-  onNewGame
-}) => {
-  return (
-    <Dialog 
-      open={open} 
-      onClose={onClose}
-      PaperProps={{
-        sx: {
-          bgcolor: '#34495e',
-          color: 'white',
-          minWidth: 300
-        }
-      }}
-    >
-      <DialogTitle>Er du sikker på, at du vil afbryde spillet?</DialogTitle>
-      <DialogActions sx={{ flexDirection: 'column', gap: 1, p: 2 }}>
-        <Button 
-          fullWidth 
-          variant="contained" 
-          color="error" 
-          onClick={onAbortGame}
-          sx={{ color: 'white' }}
-        >
-          Afbryd spil
-        </Button>
-        <Button 
-          fullWidth 
-          variant="contained" 
-          color="primary" 
-          onClick={onNewGame}
-          sx={{ color: 'white' }}
-        >
-          Spil andet spil
-        </Button>
-        <Button 
-          fullWidth 
-          variant="outlined" 
-          onClick={onClose}
-          sx={{ color: 'white', borderColor: 'white' }}
-        >
-          Annuller
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
+// Constants for layout
+const LAYOUT_CONSTANTS = {
+  MOBILE: {
+    APPBAR_HEIGHT: 56,
+    DRAWER_WIDTH: 0
+  },
+  DESKTOP: {
+    APPBAR_HEIGHT: 64,
+    DRAWER_WIDTH: drawerWidth,
+    COLLAPSED_WIDTH: 7 // theme.spacing(7)
+  }
 };
+
+// Root container styling
+const RootContainer = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  height: '100vh',
+  width: '100%',
+  overflow: 'hidden',
+  backgroundColor: theme.palette.background.default
+}));
+
+// AppBar styling
+const StyledAppBar = styled(AppBar)(({ theme }) => ({
+  position: 'fixed',
+  backgroundColor: theme.palette.background.paper,
+  borderBottom: `1px solid ${theme.palette.divider}`,
+  boxShadow: 'none',
+  width: '100%',
+  zIndex: theme.zIndex.drawer + 1
+}));
+
+// Toolbar med explicit højder
+const StyledToolbar = styled(Toolbar)(({ theme }) => ({
+  minHeight: LAYOUT_CONSTANTS.MOBILE.APPBAR_HEIGHT,
+  padding: theme.spacing(0, 1),
+  display: 'flex',
+  alignItems: 'center',
+  [theme.breakpoints.up('sm')]: {
+    minHeight: LAYOUT_CONSTANTS.DESKTOP.APPBAR_HEIGHT,
+    padding: theme.spacing(0, 2)
+  }
+}));
+
+// Base drawer styling
+const StyledDrawer = styled(Drawer)(({ theme }) => ({
+  flexShrink: 0,
+  whiteSpace: 'nowrap',
+  boxSizing: 'border-box',
+  '& .MuiDrawer-paper': {
+    backgroundColor: theme.palette.background.paper,
+    transition: theme.transitions.create(['width', 'transform'], {
+      easing: theme.transitions.easing.sharp,
+      duration: theme.transitions.duration.enteringScreen,
+    }),
+    overflowX: 'hidden',
+    borderRight: `1px solid ${theme.palette.divider}`,
+    top: LAYOUT_CONSTANTS.MOBILE.APPBAR_HEIGHT,
+    height: `calc(100% - ${LAYOUT_CONSTANTS.MOBILE.APPBAR_HEIGHT}px)`,
+    [theme.breakpoints.up('sm')]: {
+      top: LAYOUT_CONSTANTS.DESKTOP.APPBAR_HEIGHT,
+      height: `calc(100% - ${LAYOUT_CONSTANTS.DESKTOP.APPBAR_HEIGHT}px)`
+    }
+  }
+}));
+
+// Main content area
+const MainContent = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  flexGrow: 1,
+  width: '100%',
+  backgroundColor: theme.palette.background.default,
+  transition: theme.transitions.create(['width', 'margin'], {
+    duration: theme.transitions.duration.enteringScreen,
+    easing: theme.transitions.easing.sharp
+  }),
+  height: '100vh',
+  overflow: 'hidden',
+  paddingTop: LAYOUT_CONSTANTS.MOBILE.APPBAR_HEIGHT,
+
+  [theme.breakpoints.up('sm')]: {
+    paddingTop: LAYOUT_CONSTANTS.DESKTOP.APPBAR_HEIGHT,
+    width: '100%',
+
+    '&.drawer-open': {
+      width: `calc(100% - ${LAYOUT_CONSTANTS.DESKTOP.DRAWER_WIDTH}px)`,
+      marginLeft: LAYOUT_CONSTANTS.DESKTOP.DRAWER_WIDTH
+    }
+  }
+}));
+
+// Content wrapper
+const ContentWrapper = styled(Box)(({ theme }) => ({
+  flexGrow: 1,
+  height: '100%',
+  padding: theme.spacing(2),
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'auto',
+
+  [theme.breakpoints.up('sm')]: {
+    padding: theme.spacing(3)
+  }
+}));
+
+const StyledListItemButton = styled(ListItemButton)(({ theme }: { theme: Theme }) => ({
+  borderRadius: '0.5rem',
+  margin: '0.25rem 0.5rem',
+  '&:hover': {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  '&.Mui-selected': {
+    backgroundColor: theme.palette.primary.main,
+    color: theme.palette.text.primary,
+    '&:hover': {
+      backgroundColor: theme.palette.primary.dark,
+    },
+  },
+}));
+
+const StyledListItemIcon = styled(ListItemIcon)(({ theme }) => ({
+  color: 'inherit',
+  minWidth: 40,
+}));
 
 const navigationItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
@@ -95,12 +160,17 @@ const navigationItems = [
   { text: 'About', icon: <InfoIcon />, path: '/about' },
 ];
 
+interface NavigationLayoutProps {
+  children: React.ReactNode;
+}
+
 const NavigationLayout = ({ children }: NavigationLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const [isOpen, setIsOpen] = useState(true);
+  const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
+  const [isOpen, setIsOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showGameInterruptDialog, setShowGameInterruptDialog] = useState(false);
   const { showingStats, setShowingStats } = useGame();
@@ -119,10 +189,20 @@ const NavigationLayout = ({ children }: NavigationLayoutProps) => {
     }
   }, [location]);
 
+  // Opdateret useEffect - drawer skal forblive lukket på mobile/tablet
+  useEffect(() => {
+    if (isMobile || isTablet) {
+      setIsOpen(false);
+    }
+  }, [isMobile, isTablet]);
+
   const handleDrawerToggle = () => {
     if (isMobile) {
       setMobileOpen(!mobileOpen);
+    } else if (isTablet) {
+      setIsOpen(!isOpen);
     } else {
+      // På desktop kan vi tillade at den er åben som default hvis ønsket
       setIsOpen(!isOpen);
     }
   };
@@ -160,171 +240,174 @@ const NavigationLayout = ({ children }: NavigationLayoutProps) => {
   };
 
   const drawer = (
-    <Box sx={{ overflow: 'auto', mt: 2 }}>
+    <Box>
       <List>
         {navigationItems.map((item) => (
-          <ListItemButton
+          <StyledListItemButton
             key={item.text}
+            selected={location.pathname === item.path}
             onClick={() => {
-              navigate(item.path);
+              if (isInGame) {
+                setShowGameInterruptDialog(true);
+              } else {
+                navigate(item.path);
+              }
               if (isMobile) {
                 setMobileOpen(false);
               }
             }}
-            selected={location.pathname === item.path}
-            sx={{ 
-              color: 'white',
-              '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.1)',
-              },
-              '&.Mui-selected': {
-                bgcolor: 'rgba(255, 255, 255, 0.1)',
-              },
-              '&.Mui-selected:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.2)',
-              }
-            }}
           >
-            <ListItemIcon sx={{ color: 'white' }}>
+            <StyledListItemIcon>
               {item.icon}
-            </ListItemIcon>
-            <ListItemText primary={item.text} />
-          </ListItemButton>
+            </StyledListItemIcon>
+            <ListItemText 
+              primary={item.text}
+              primaryTypographyProps={{
+                sx: {
+                  fontSize: '0.875rem',
+                  fontWeight: location.pathname === item.path ? 600 : 400,
+                }
+              }}
+            />
+          </StyledListItemButton>
         ))}
       </List>
     </Box>
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <RootContainer>
+      <CssBaseline />
+      <StyledAppBar>
+        <StyledToolbar>
+          <IconButton
+            color="inherit"
+            aria-label="toggle drawer"
+            onClick={handleDrawerToggle}
+            edge="start"
+            sx={{ mr: 2 }}
+          >
+            {isMobile ? <MenuIcon /> : (isOpen ? <ChevronLeftIcon /> : <MenuIcon />)}
+          </IconButton>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            width: '100%',
+            overflow: 'hidden'
+          }}>
+            {(isInGame || !isOnDashboard) && (
+              <IconButton color="inherit" onClick={handleBack} sx={{ mr: 1 }}>
+                <ArrowBackIcon />
+              </IconButton>
+            )}
+            <Typography 
+              variant="h6" 
+              noWrap 
+              component="div" 
+              sx={{ 
+                flexGrow: 1,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {getCurrentPageTitle()}
+            </Typography>
+            {isInGame && (
+              <IconButton 
+                color="inherit" 
+                onClick={showingStats ? handleBackToGame : handleStats}
+              >
+                {showingStats ? <SportsScoreIcon /> : <BarChartIcon />}
+              </IconButton>
+            )}
+          </Box>
+        </StyledToolbar>
+      </StyledAppBar>
+
+      {/* Mobile drawer */}
+      <StyledDrawer
+        variant="temporary"
+        anchor="left"
+        open={mobileOpen}
+        onClose={handleDrawerToggle}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          display: { xs: 'block', sm: 'none' },
+          '& .MuiDrawer-paper': {
+            width: LAYOUT_CONSTANTS.DESKTOP.DRAWER_WIDTH,
+            transform: mobileOpen ? 'none' : 'translateX(-100%)'
+          }
+        }}
+      >
+        {drawer}
+      </StyledDrawer>
+
+      {/* Desktop drawer */}
+      <StyledDrawer
+        variant="permanent"
+        sx={{
+          display: { xs: 'none', sm: 'block' },
+          '& .MuiDrawer-paper': {
+            width: isOpen ? LAYOUT_CONSTANTS.DESKTOP.DRAWER_WIDTH : 0,
+            transform: isOpen ? 'none' : 'translateX(-100%)',
+            visibility: 'visible'
+          }
+        }}
+        open={isOpen}
+      >
+        {drawer}
+      </StyledDrawer>
+
+      <MainContent
+        className={isOpen ? 'drawer-open' : ''}
+      >
+        <ContentWrapper>
+          {children}
+        </ContentWrapper>
+      </MainContent>
+
       {/* Game Interrupt Dialog */}
-      <GameInterruptDialog
+      <Dialog
         open={showGameInterruptDialog}
         onClose={() => setShowGameInterruptDialog(false)}
-        onAbortGame={handleAbortGame}
-        onNewGame={handleNewGame}
-      />
-
-      {/* Top Bar */}
-      <AppBar 
-        position="fixed" 
-        sx={{ 
-          zIndex: (theme) => theme.zIndex.drawer + 1,
-          bgcolor: '#2c3e50',
-          width: '100%',
+        PaperProps={{
+          sx: {
+            backgroundColor: theme.palette.background.paper,
+            borderRadius: '0.5rem',
+            margin: 2,
+            maxWidth: 'calc(100% - 32px)',
+            maxHeight: 'calc(100% - 32px)',
+          }
         }}
       >
-        <Toolbar>
-          {!isOnDashboard ? (
-            <IconButton
-              color="inherit"
-              edge="start"
-              onClick={handleBack}
-              sx={{ mr: 2 }}
-            >
-              <ArrowBackIcon />
-            </IconButton>
-          ) : (
-            <IconButton
-              color="inherit"
-              edge="start"
-              onClick={handleDrawerToggle}
-              sx={{ mr: 2 }}
-            >
-              {isMobile ? <MenuIcon /> : (isOpen ? <ChevronLeftIcon /> : <MenuIcon />)}
-            </IconButton>
-          )}
-          
-          <Typography 
-            variant="h6" 
-            component="div" 
-            sx={{ 
-              flexGrow: 1,
-              textAlign: showingStats ? 'center' : 'left'
-            }}
-          >
-            {getCurrentPageTitle()}
+        <DialogTitle>
+          Leave Game?
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to leave the current game? All progress will be lost.
           </Typography>
-
-          {isInGame && showingStats && (
-            <IconButton
-              color="inherit"
-              onClick={handleBackToGame}
-              sx={{ 
-                bgcolor: 'rgba(255,255,255,0.1)',
-                '&:hover': {
-                  bgcolor: 'rgba(255,255,255,0.2)'
-                }
-              }}
-            >
-              <ArrowBackIcon />
-            </IconButton>
-          )}
-
-          {isInGame && !showingStats && (
-            <IconButton
-              color="inherit"
-              onClick={handleStats}
-              sx={{ 
-                ml: 'auto',
-                bgcolor: 'rgba(255,255,255,0.1)',
-                '&:hover': {
-                  bgcolor: 'rgba(255,255,255,0.2)'
-                }
-              }}
-            >
-              <BarChartIcon />
-            </IconButton>
-          )}
-
-          {!isInGame && (
-            <IconButton
-              color="inherit"
-              onClick={() => navigate('/profile')}
-            >
-              <PersonIcon />
-            </IconButton>
-          )}
-        </Toolbar>
-      </AppBar>
-
-      {/* Side Navigation */}
-      <Drawer
-        variant={isMobile ? "temporary" : "temporary"}
-        open={isMobile ? mobileOpen : isOpen}
-        onClose={handleDrawerToggle}
-        ModalProps={{
-          keepMounted: true,
-        }}
-        sx={{
-          '& .MuiDrawer-paper': {
-            boxSizing: 'border-box',
-            width: drawerWidth,
-            bgcolor: '#34495e',
-            color: 'white',
-            position: 'fixed',
-            height: '100%',
-            zIndex: theme.zIndex.drawer,
-          },
-        }}
-      >
-        <Toolbar /> {/* Spacing for AppBar */}
-        {drawer}
-      </Drawer>
-
-      {/* Main Content */}
-      <Box 
-        component="main" 
-        sx={{ 
-          flexGrow: 1,
-          p: 0,
-          width: '100%',
-        }}
-      >
-        <Toolbar /> {/* Spacing for AppBar */}
-        {children}
-      </Box>
-    </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button 
+            onClick={() => setShowGameInterruptDialog(false)}
+            sx={{ color: theme.palette.text.primary }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              setShowGameInterruptDialog(false);
+              navigate('/dashboard');
+            }}
+            variant="contained"
+            color="error"
+          >
+            Leave Game
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </RootContainer>
   );
 };
 

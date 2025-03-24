@@ -1,8 +1,42 @@
-import { Box, Typography, Paper, useTheme, useMediaQuery } from '@mui/material';
+import { Box, Typography, useTheme, useMediaQuery } from '@mui/material';
+import { styled } from '@mui/material/styles';
 
 interface CheckoutGuideProps {
   score: number;
 }
+
+// Styled components
+const StyledGuideContainer = styled(Box)(({ theme }) => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: theme.spacing(1),
+  padding: theme.spacing(1.5, 2),
+  borderRadius: theme.shape.borderRadius * 2,
+  backgroundColor: theme.palette.success.dark,
+  border: `1px solid ${theme.palette.success.light}`,
+  transition: theme.transitions.create(['transform', 'box-shadow'], {
+    duration: theme.transitions.duration.short
+  }),
+  '&:hover': {
+    transform: 'scale(1.02)',
+    boxShadow: theme.shadows[4]
+  }
+}));
+
+const StyledLabel = styled(Typography)(({ theme }) => ({
+  fontWeight: 700,
+  color: theme.palette.success.contrastText,
+  [theme.breakpoints.down('sm')]: {
+    fontSize: '0.875rem'
+  }
+}));
+
+const StyledRoute = styled(Typography)(({ theme }) => ({
+  color: '#fff',
+  [theme.breakpoints.down('sm')]: {
+    fontSize: '0.875rem'
+  }
+}));
 
 // Checkout data fra 170 og ned
 const checkouts: { [key: number]: string } = {
@@ -172,7 +206,6 @@ const checkouts: { [key: number]: string } = {
 
 const CheckoutGuide = ({ score }: CheckoutGuideProps) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   // Hvis scoren ikke har en checkout mulighed eller er under 2
   if (!checkouts[score] || score < 2) {
@@ -180,26 +213,14 @@ const CheckoutGuide = ({ score }: CheckoutGuideProps) => {
   }
 
   return (
-    <Paper
-      elevation={3}
-      sx={{
-        p: 1,
-        bgcolor: theme.palette.success.light,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 1
-      }}
-    >
-      <Typography
-        variant={isMobile ? "body2" : "body1"}
-        sx={{ fontWeight: 'bold' }}
-      >
+    <StyledGuideContainer>
+      <StyledLabel>
         Checkout:
-      </Typography>
-      <Typography variant={isMobile ? "body2" : "body1"}>
+      </StyledLabel>
+      <StyledRoute>
         {checkouts[score]}
-      </Typography>
-    </Paper>
+      </StyledRoute>
+    </StyledGuideContainer>
   );
 };
 

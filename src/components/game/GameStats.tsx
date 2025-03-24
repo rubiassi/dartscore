@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography, useTheme } from '@mui/material';
+import { styled } from '@mui/material/styles';
 import GameStatistics from '../../utils/GameStatistics';
 
 interface PlayerStats {
@@ -46,95 +47,120 @@ interface GameStatsProps {
   };
 }
 
+const StatsContainer = styled(Box)(({ theme }) => ({
+  backgroundColor: theme.palette.background.default,
+  minHeight: '100vh',
+  color: theme.palette.text.primary,
+  padding: theme.spacing(2),
+  display: 'flex',
+  flexDirection: 'column',
+  position: 'fixed',
+  top: 20,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  paddingTop: theme.spacing(8),
+  overflowY: 'auto',
+  transition: theme.transitions.create(['background-color', 'color'], {
+    duration: theme.transitions.duration.standard,
+  })
+}));
+
+const StatsRow = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  justifyContent: 'space-between',
+  marginBottom: theme.spacing(1),
+  padding: `${theme.spacing(1)} 0`,
+  transition: theme.transitions.create(['background-color'], {
+    duration: theme.transitions.duration.short,
+  }),
+  '&:hover': {
+    backgroundColor: theme.palette.action.hover,
+  }
+}));
+
+const StatValue = styled(Typography)(({ theme }) => ({
+  flex: 1,
+  textAlign: 'center',
+  padding: `0 ${theme.spacing(3)}`,
+  transition: theme.transitions.create(['color'], {
+    duration: theme.transitions.duration.short,
+  })
+}));
+
+const StatLabel = styled(Typography)(({ theme }) => ({
+  flex: 1,
+  textAlign: 'center',
+  color: theme.palette.text.secondary
+}));
+
+const SectionHeader = styled(Box)(({ theme }) => ({
+  backgroundColor: theme.palette.background.paper,
+  padding: theme.spacing(1.5),
+  marginBottom: theme.spacing(2),
+  marginTop: theme.spacing(3),
+  borderTop: `1px solid ${theme.palette.divider}`,
+  borderBottom: `1px solid ${theme.palette.divider}`,
+  transition: theme.transitions.create(['background-color', 'border-color'], {
+    duration: theme.transitions.duration.standard,
+  })
+}));
+
+const SectionTitle = styled(Typography)(({ theme }) => ({
+  color: theme.palette.text.primary,
+  textAlign: 'center',
+  textTransform: 'uppercase',
+  fontSize: '0.9rem',
+  letterSpacing: 1,
+  fontWeight: 600
+}));
+
+const PlayerHeaderContainer = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  justifyContent: 'space-between',
+  marginBottom: theme.spacing(3),
+  padding: `0 ${theme.spacing(2)}`,
+  borderBottom: `1px solid ${theme.palette.divider}`,
+  paddingBottom: theme.spacing(1),
+  transition: theme.transitions.create(['border-color'], {
+    duration: theme.transitions.duration.standard,
+  })
+}));
+
+const PlayerName = styled(Typography)(({ theme }) => ({
+  flex: 1,
+  textAlign: 'center',
+  fontWeight: 600,
+  color: theme.palette.primary.main
+}));
+
 const StatRow: React.FC<{ 
   label: string;
   player1Value: string | number;
   player2Value: string | number;
 }> = ({ label, player1Value, player2Value }) => (
-  <Box sx={{ 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    mb: 1,
-    px: 0
-  }}>
-    <Typography sx={{ 
-      flex: 1, 
-      textAlign: 'center',
-      pl: 3
-    }}>
-      {player1Value}
-    </Typography>
-    <Typography sx={{ 
-      flex: 1, 
-      textAlign: 'center',
-      color: 'rgba(255,255,255,0.7)'
-    }}>
-      {label}
-    </Typography>
-    <Typography sx={{ 
-      flex: 1, 
-      textAlign: 'center',
-      pr: 3
-    }}>
-      {player2Value}
-    </Typography>
-  </Box>
+  <StatsRow>
+    <StatValue>{player1Value}</StatValue>
+    <StatLabel>{label}</StatLabel>
+    <StatValue>{player2Value}</StatValue>
+  </StatsRow>
 );
 
-const SectionTitle: React.FC<{ title: string }> = ({ title }) => (
-  <Box
-    sx={{
-      bgcolor: '#1a2634',
-      py: 1.5,
-      mb: 2,
-      mt: 3,
-      borderTop: '1px solid rgba(255,255,255,0.1)',
-      borderBottom: '1px solid rgba(255,255,255,0.1)',
-    }}
-  >
-    <Typography
-      variant="h6"
-      sx={{
-        color: 'white',
-        textAlign: 'center',
-        textTransform: 'uppercase',
-        fontSize: '0.9rem',
-        letterSpacing: 1
-      }}
-    >
-      {title}
-    </Typography>
-  </Box>
+const SectionTitleComponent: React.FC<{ title: string }> = ({ title }) => (
+  <SectionHeader>
+    <SectionTitle>{title}</SectionTitle>
+  </SectionHeader>
 );
 
 const PlayerHeader: React.FC<{ 
   player1Name: string;
   player2Name: string;
 }> = ({ player1Name, player2Name }) => (
-  <Box sx={{ 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    mb: 3,
-    px: 0,
-    borderBottom: '1px solid rgba(255,255,255,0.1)',
-    pb: 1
-  }}>
-    <Typography sx={{ 
-      flex: 1, 
-      textAlign: 'center',
-      pl: 3
-    }}>
-      {player1Name}
-    </Typography>
+  <PlayerHeaderContainer>
+    <PlayerName>{player1Name}</PlayerName>
     <Box sx={{ flex: 1 }} />
-    <Typography sx={{ 
-      flex: 1, 
-      textAlign: 'center',
-      pr: 3
-    }}>
-      {player2Name}
-    </Typography>
-  </Box>
+    <PlayerName>{player2Name}</PlayerName>
+  </PlayerHeaderContainer>
 );
 
 const GameStats: React.FC<GameStatsProps> = ({
@@ -142,27 +168,11 @@ const GameStats: React.FC<GameStatsProps> = ({
   player2
 }) => {
   return (
-    <Box
-      sx={{
-        bgcolor: '#2c3e50',
-        minHeight: '100vh',
-        color: 'white',
-        py: 2,
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'fixed',
-        top: 20,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        pt: '64px',
-        overflowY: 'auto'
-      }}
-    >
+    <StatsContainer>
       <PlayerHeader player1Name={player1.name} player2Name={player2.name} />
 
       {/* General Section */}
-      <SectionTitle title="General" />
+      <SectionTitleComponent title="General" />
       <StatRow 
         label="average" 
         player1Value={player1.stats.averages.overall.toFixed(2)}
@@ -195,7 +205,7 @@ const GameStats: React.FC<GameStatsProps> = ({
       />
 
       {/* Checkout Section */}
-      <SectionTitle title="Checkout" />
+      <SectionTitleComponent title="Checkout" />
       <StatRow 
         label="percentage" 
         player1Value={`${player1.stats.checkouts.percentage.toFixed(2)}%`}
@@ -208,7 +218,7 @@ const GameStats: React.FC<GameStatsProps> = ({
       />
 
       {/* Total Darts og Highest Finish Section */}
-      <SectionTitle title="Game Stats" />
+      <SectionTitleComponent title="Game Stats" />
       <StatRow 
         label="Total Darts" 
         player1Value={GameStatistics.calculateTotalDartsThrown(player1.stats.gameData)}
@@ -221,7 +231,7 @@ const GameStats: React.FC<GameStatsProps> = ({
       />
 
       {/* Legs Won Section */}
-      <SectionTitle title="Leg won in darts" />
+      <SectionTitleComponent title="Leg won in darts" />
       <StatRow 
         label="9 darts" 
         player1Value={player1.stats.legsWon.nine}
@@ -259,7 +269,7 @@ const GameStats: React.FC<GameStatsProps> = ({
       />
 
       {/* Scores Section */}
-      <SectionTitle title="Scores" />
+      <SectionTitleComponent title="Scores" />
       <StatRow 
         label="180's" 
         player1Value={player1.stats.scoring.oneEighty}
@@ -295,7 +305,7 @@ const GameStats: React.FC<GameStatsProps> = ({
         player1Value={player1.stats.scoring.oneToTwenty}
         player2Value={player2.stats.scoring.oneToTwenty}
       />
-    </Box>
+    </StatsContainer>
   );
 };
 

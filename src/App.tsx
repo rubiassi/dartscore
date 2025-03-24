@@ -1,82 +1,20 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import React from 'react';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { createTheme } from '@mui/material/styles';
+import { theme } from './theme';
+import { BrowserRouter } from 'react-router-dom';
 import { GameProvider } from './context/GameContext';
-
-// Import pages
-import InfoPage from './pages/InfoPage';
-import Dashboard from './pages/Dashboard';
-import Local from './pages/Local';
-import X01Setup from './pages/X01Setup';
-import X01Game from './pages/X01Game';
-import NavigationLayout from './components/layout/NavigationLayout';
-
-// Theme configuration
-const theme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: {
-      main: '#2c3e50',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-  },
-});
-
-// Wrapper component for X01Game to handle state
-const X01GameWrapper = () => {
-  const location = useLocation();
-  const gameConfig = location.state;
-
-  if (!gameConfig) {
-    return <Navigate to="/x01setup" replace />;
-  }
-
-  return (
-    <NavigationLayout>
-      <X01Game />
-    </NavigationLayout>
-  );
-};
-
-const X01GameRoute = () => {
-  return (
-    <NavigationLayout>
-      <X01Game />
-    </NavigationLayout>
-  );
-};
+import AppRoutes from './routes/AppRoutes';
 
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <GameProvider>
-        <Router>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<InfoPage />} />
-            
-            {/* Protected routes with navigation */}
-            <Route path="/dashboard" element={<NavigationLayout><Dashboard /></NavigationLayout>} />
-            <Route path="/local" element={<NavigationLayout><Local /></NavigationLayout>} />
-            <Route path="/x01setup" element={<NavigationLayout><X01Setup /></NavigationLayout>} />
-            <Route path="/x01game" element={<X01GameRoute />} />
-            
-            {/* Placeholder routes */}
-            <Route path="/profile" element={<NavigationLayout><div>Profile Coming Soon</div></NavigationLayout>} />
-            <Route path="/friends" element={<NavigationLayout><div>Friends Coming Soon</div></NavigationLayout>} />
-            <Route path="/teams" element={<NavigationLayout><div>Teams Coming Soon</div></NavigationLayout>} />
-            <Route path="/statistics" element={<NavigationLayout><div>Statistics Coming Soon</div></NavigationLayout>} />
-            <Route path="/history" element={<NavigationLayout><div>History Coming Soon</div></NavigationLayout>} />
-            <Route path="/achievements" element={<NavigationLayout><div>Achievements Coming Soon</div></NavigationLayout>} />
-            <Route path="/settings" element={<NavigationLayout><div>Settings Coming Soon</div></NavigationLayout>} />
-            <Route path="/about" element={<NavigationLayout><div>About Coming Soon</div></NavigationLayout>} />
-          </Routes>
-        </Router>
-      </GameProvider>
+      <BrowserRouter>
+        <GameProvider>
+          <AppRoutes />
+        </GameProvider>
+      </BrowserRouter>
     </ThemeProvider>
   );
 }

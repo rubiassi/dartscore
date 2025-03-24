@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Button,
@@ -10,9 +10,227 @@ import {
   useTheme,
   useMediaQuery
 } from '@mui/material';
+import { styled } from '@mui/material/styles';
 import UndoIcon from '@mui/icons-material/Undo';
 import { Player, GameConfig } from '../../types/game';
-import CheckoutValidator from '../../utils/CheckoutValidator';
+import doubleOutData from '../../data/Double-UD.json';
+import DartCheckoutModal from '../dialogs/DartCheckoutModal';
+import DoubleAttemptModal from '../dialogs/DoubleAttemptModal';
+
+// Styled components
+const StyledInputContainer = styled(Box)(({ theme }) => ({
+  width: '100%',
+  height: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  backgroundColor: theme.palette.background.default,
+  borderRadius: theme.shape.borderRadius,
+  overflow: 'hidden',
+  [theme.breakpoints.down('sm')]: {
+    maxHeight: '100%',
+    borderRadius: 0
+  },
+  '@media (min-width: 1024px) and (max-width: 1366px) and (orientation: landscape)': {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    margin: '0 auto',
+    maxWidth: '637px', // 796 * 0.8
+    height: '437px'    // 546 * 0.8
+  }
+}));
+
+const StyledInputHeader = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: theme.spacing(0.75),
+  gap: theme.spacing(0.75),
+  height: '64px',
+  width: '100%',
+  backgroundColor: theme.palette.background.paper,
+  borderBottom: `1px solid ${theme.palette.divider}`,
+  '& > button': {
+    flex: '0 0 auto',
+    width: 'calc(20% - 6px)',  // 20% for 5 kolonner minus gap
+    height: '63px'
+  },
+  '& > p': {
+    flex: '1 1 auto',
+    textAlign: 'center',
+    fontSize: '2rem',
+    fontWeight: 600,
+    margin: '0 8px'
+  },
+  // Responsive styles
+  [theme.breakpoints.down('sm')]: {
+    padding: theme.spacing(1),
+    gap: theme.spacing(1),
+    '& > button': {
+      width: 'calc(20% - 8px)'  // Justeret for større gap på mobile
+    }
+  },
+  '@media (min-width: 1024px) and (max-width: 1366px) and (orientation: landscape)': {
+    padding: theme.spacing(0.5),
+    gap: theme.spacing(0.5),
+    '& > button': {
+      width: 'calc((713px - 28px) / 5 - 6px)'  // Tilpasset til faktisk container bredde
+    }
+  }
+}));
+
+const StyledNumberPad = styled(Box)(({ theme }) => ({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(5, 1fr)',
+  gridTemplateRows: 'repeat(4, 1fr)',
+  gap: theme.spacing(0.75),
+  padding: theme.spacing(0.75),
+  backgroundColor: theme.palette.background.default,
+  flex: 1,
+  minHeight: 0,
+  overflow: 'hidden',
+  '@media (min-width: 1024px) and (max-width: 1366px) and (orientation: landscape)': {
+    alignContent: 'center',
+    gap: theme.spacing(0.5),
+    padding: theme.spacing(1),
+    height: 'calc(424px - 127px)',
+    '& > button': {
+      height: 'calc((424px - 127px - 0px) / 4)'
+    }
+  }
+}));
+
+const StyledActionButton = styled(Button, {
+  shouldForwardProp: (prop) => prop !== 'isFixedScore' && prop !== 'isAction'
+})<{ isFixedScore?: boolean; isAction?: boolean }>(({ theme, isFixedScore, isAction }) => ({
+  color: isAction ? theme.palette.primary.main : theme.palette.text.primary,
+  backgroundColor: isFixedScore 
+    ? theme.palette.action.selected
+    : theme.palette.background.paper,
+  height: '100%',
+  minHeight: '48px',
+  borderRadius: theme.shape.borderRadius,
+  border: `1px solid ${theme.palette.divider}`,
+  userSelect: 'none',
+  fontSize: '1.25rem',
+  fontWeight: 600,
+  padding: 0,
+  transition: theme.transitions.create(
+    ['background-color', 'transform', 'box-shadow', 'color'],
+    { duration: theme.transitions.duration.short }
+  ),
+  '&:hover': {
+    backgroundColor: isFixedScore 
+      ? theme.palette.action.hover
+      : theme.palette.action.hover,
+    transform: 'scale(0.98)',
+    boxShadow: theme.shadows[2]
+  },
+  '&:active': {
+    transform: 'scale(0.95)',
+    boxShadow: theme.shadows[1]
+  },
+  '@media (min-width: 1024px) and (max-width: 1366px) and (orientation: landscape)': {
+    fontSize: '1.75rem',
+    fontWeight: 600,
+    boxShadow: theme.shadows[1],
+    '&.digit-button': {
+      fontSize: '2rem',
+      fontWeight: 700
+    },
+    '&.fixed-score-button': {
+      fontSize: '2rem',
+      fontWeight: 600
+    }
+  }
+}));
+
+const StyledDialog = styled(Dialog)(({ theme }) => ({
+  '& .MuiDialog-paper': {
+    backgroundColor: theme.palette.background.paper,
+    color: theme.palette.text.primary,
+    borderRadius: theme.shape.borderRadius * 2,
+    padding: theme.spacing(2),
+    [theme.breakpoints.up('sm')]: {
+      padding: theme.spacing(3)
+    }
+  }
+}));
+
+const StyledDialogTitle = styled(DialogTitle)(({ theme }) => ({
+  fontSize: '1.25rem',
+  fontWeight: 600,
+  textAlign: 'center',
+  padding: theme.spacing(2, 3),
+  [theme.breakpoints.up('sm')]: {
+    fontSize: '1.5rem'
+  }
+}));
+
+const StyledDialogContent = styled(DialogContent)(({ theme }) => ({
+  padding: theme.spacing(2, 3),
+  '& .MuiTypography-root': {
+    marginBottom: theme.spacing(2)
+  }
+}));
+
+const StyledDialogActions = styled(DialogActions)(({ theme }) => ({
+  padding: theme.spacing(2, 3),
+  gap: theme.spacing(2)
+}));
+
+const StyledScoreDisplay = styled(Typography)(({ theme }) => ({
+  fontSize: '2rem',
+  fontWeight: 700,
+  color: theme.palette.text.primary,
+  [theme.breakpoints.up('sm')]: {
+    fontSize: '2.5rem'
+  },
+  [theme.breakpoints.down('sm')]: {
+    fontSize: '3rem'
+  },
+  '@media (min-width: 1024px) and (max-width: 1366px) and (orientation: landscape)': {
+    fontSize: '3.5rem'
+  }
+}));
+
+const StyledUndoButton = styled(Button)(({ theme }) => ({
+  minWidth: 'auto',
+  padding: 0,
+  color: theme.palette.text.secondary,
+  '&:hover': {
+    color: theme.palette.primary.main
+  },
+  '& .MuiSvgIcon-root': {
+    fontSize: '1.75rem'
+  },
+  // Responsive styles
+  [theme.breakpoints.down('sm')]: {
+    '& .MuiSvgIcon-root': {
+      fontSize: '2rem'
+    }
+  },
+  '@media (min-width: 1024px) and (max-width: 1366px) and (orientation: landscape)': {
+    '& .MuiSvgIcon-root': {
+      fontSize: '2.25rem'
+    }
+  }
+}));
+
+// Gyldige checkout scores (170 og ned)
+const VALID_CHECKOUT_SCORES = [
+  170, 167, 164, 161, 160, 158, 157, 156, 155, 154, 153, 152, 151, 150,
+  149, 148, 147, 146, 145, 144, 143, 142, 141, 140, 139, 138, 137, 136,
+  135, 134, 133, 132, 131, 130, 129, 128, 127, 126, 125, 124, 123, 122,
+  121, 120, 119, 118, 117, 116, 115, 114, 113, 112, 111, 110, 109, 108,
+  107, 106, 105, 104, 103, 102, 101, 100, 99, 98, 97, 96, 95, 94, 93,
+  92, 91, 90, 89, 88, 87, 86, 85, 84, 83, 82, 81, 80, 79, 78, 77, 76,
+  75, 74, 73, 72, 71, 70, 69, 68, 67, 66, 65, 64, 63, 62, 61, 60, 59,
+  58, 57, 56, 55, 54, 53, 52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42,
+  41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31, 30, 29, 28, 27, 26, 25,
+  24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7,
+  6, 5, 4, 3, 2
+];
 
 interface ScoreInputProps {
   currentPlayer: Player;
@@ -21,25 +239,28 @@ interface ScoreInputProps {
   gameConfig: GameConfig;
 }
 
+interface DoubleOutOption {
+  rest: number;
+  points: number;
+  darts: number;
+  checkdarts: number[];
+}
+
 const ScoreInput: React.FC<ScoreInputProps> = ({
   currentPlayer,
   currentScore,
   onScore,
   gameConfig
 }) => {
+  const [inputScore, setInputScore] = useState<string>('');
+  const [isDartModalOpen, setIsDartModalOpen] = useState(false);
+  const [isDoubleAttemptModalOpen, setIsDoubleAttemptModalOpen] = useState(false);
+  const [tempScore, setTempScore] = useState<number>(0);
+  const [checkDartsOptions, setCheckDartsOptions] = useState<number[]>([]);
+  const [checkLukningResult, setCheckLukningResult] = useState<DoubleOutOption | null>(null);
+  
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  
-  const [inputValue, setInputValue] = useState<string>('');
-  const [showCheckoutDialog, setShowCheckoutDialog] = useState(false);
-  const [showDoubleAttemptDialog, setShowDoubleAttemptDialog] = useState(false);
-  const [showDoubleCountDialog, setShowDoubleCountDialog] = useState(false);
-  const [showDoubleAttemptDartsDialog, setShowDoubleAttemptDartsDialog] = useState(false);
-  const [selectedScore, setSelectedScore] = useState<number>(0);
-  const [dartsUsed, setDartsUsed] = useState<number>(0);
-  const [minimumDartsRequired, setMinimumDartsRequired] = useState<number>(1);
-  const [maxDartsAllowed, setMaxDartsAllowed] = useState<number>(3);
-  const [isCheckoutGuideVisible, setIsCheckoutGuideVisible] = useState(false);
 
   const shortcutScores = [
     26, 1, 2, 3, 81,
@@ -48,608 +269,196 @@ const ScoreInput: React.FC<ScoreInputProps> = ({
     'Clear', 140, 0, 180, 'Ok'
   ];
 
-  // Definér faste scores, der skal have en anden farve
   const fixedScores = [26, 41, 45, 140, 180, 81, 85, 100];
+
+  const isDouble = (score: number) => {
+    return score % 2 === 0 && score > 0;
+  };
+
+  const findCheckDartsOptions = (rest: number, points: number) => {
+    const matchingOption = doubleOutData.find((option) => 
+      option.rest === rest && option.points === points
+    );
+    return matchingOption ? matchingOption.checkdarts : [];
+  };
+
+  const findClosingOptions = (rest: number, points: number) => {
+    if (rest === points) {
+      points = 0;
+    }
+
+    return doubleOutData.filter((option) => 
+      option.rest === rest && option.points === points
+    );
+  };
+
+  const handleOpenDartModal = (closingOption: DoubleOutOption) => {
+    setTempScore(currentScore - closingOption.points);
+    setCheckLukningResult(closingOption);
+    setIsDartModalOpen(true);
+  };
+
+  const handleDartSelect = (darts: number) => {
+    setIsDartModalOpen(false);
+    if (!checkLukningResult) return;
+    
+    const doubleAttempts = checkLukningResult.checkdarts.length - 1;
+    onScore(tempScore, darts, doubleAttempts);
+    setInputScore('');
+    setCheckLukningResult(null);
+  };
+
+  const handleSelectDoubleAttempt = (attempts: number) => {
+    setIsDoubleAttemptModalOpen(false);
+    onScore(tempScore, 3, attempts);
+    setInputScore('');
+    setCheckDartsOptions([]);
+  };
+
+  const handleScoreInput = (score: number) => {
+    const newScore = currentScore - score;
+
+    // Tjek for ugyldige scores
+    if (newScore < 0) {
+      console.log("Score for høj:", score);
+      handleBust();
+      return;
+    }
+
+    // Tjek for ugyldig remaining score (kan ikke være 1)
+    if (newScore === 1) {
+      console.log("Kan ikke efterlade score på 1");
+      handleBust();
+      return;
+    }
+
+    if (gameConfig.showCheckout) {
+      const checkDarts = findCheckDartsOptions(currentScore, score);
+      if (newScore > 0 && checkDarts.length > 1) {
+        setTempScore(score);
+        setCheckDartsOptions(checkDarts);
+        setIsDoubleAttemptModalOpen(true);
+        return;
+      }
+
+      if (newScore === 0) {
+        const closingOptions = findClosingOptions(currentScore, score);
+        if (closingOptions.length > 0) {
+          handleOpenDartModal(closingOptions[0]);
+          return;
+        }
+      }
+    }
+
+    onScore(score, 3, 0);
+    setInputScore('');
+  };
+
+  const handleBust = () => {
+    onScore(0, 3, 0);
+    setInputScore('');
+  };
+
+  const handleUndo = () => {
+    if (inputScore.length > 0) {
+      setInputScore(inputScore.slice(0, -1));
+    }
+  };
 
   const handleNumberClick = (value: number | string) => {
     if (value === 'Clear') {
-      setInputValue('');
-      setIsCheckoutGuideVisible(false);
+      setInputScore('');
     } else if (value === 'Ok') {
-      if (isCheckoutGuideVisible) {
-        // Hvis checkout guiden er synlig, behandl det som en checkout
-        handleCheckoutAttempt();
-      } else if (inputValue) {
+      if (inputScore) {
         // Normal score håndtering
-        const score = parseInt(inputValue);
+        const score = parseInt(inputScore);
         handleScoreInput(score);
       }
     } else if (typeof value === 'number') {
-      if (isCheckoutGuideVisible) {
-        // Hvis der tastes et tal mens checkout guiden er synlig, skjul den
-        setIsCheckoutGuideVisible(false);
-      }
-      
       if (fixedScores.includes(value)) {
         // Håndtér faste score-knapper
         handleScoreInput(value);
       } else {
         // Håndtér cifre (0-9) for at opbygge en score
-        const newValue = inputValue + value.toString();
+        const newValue = inputScore + value.toString();
         const numberValue = parseInt(newValue);
         if (numberValue <= 180) {
-          setInputValue(newValue);
+          setInputScore(newValue);
         }
       }
     }
-  };
-
-  const handleScoreInput = (score: number) => {
-    if (score <= currentScore && score <= 180) {
-      const newScore = currentScore - score;
-      setSelectedScore(score);
-      
-      if (gameConfig.useDoubles) {
-        if (newScore === 0) {
-          // Checkout situation - brug eksisterende logik
-          const checkoutInfo = CheckoutValidator.validateCheckout(currentScore, score);
-          if (checkoutInfo.isPossible) {
-            if (checkoutInfo.minimumDarts < 3) {
-              setMinimumDartsRequired(checkoutInfo.minimumDarts);
-              setShowCheckoutDialog(true);
-            } else {
-              setDartsUsed(3);
-              setShowDoubleAttemptDialog(true);
-            }
-          } else {
-            setDartsUsed(3);
-            setShowDoubleAttemptDialog(true);
-          }
-        } else if (newScore >= 2 && newScore <= 40) {
-          // Double forsøg logik (ikke checkout)
-          if (currentScore > 100) {
-            // Over 2-darts kombination (fx 141 -> 101 -> 40)
-            // Her kan der kun være brugt 1 dart på double
-            setMinimumDartsRequired(1);
-            setMaxDartsAllowed(1);
-            setShowDoubleAttemptDartsDialog(true);
-          } else if (currentScore > 60) {
-            // 2-darts kombination (fx 100 -> 60 -> 40)
-            // Her kan der være brugt 1-2 darts på double
-            setMinimumDartsRequired(1);
-            setMaxDartsAllowed(2);
-            setShowDoubleAttemptDartsDialog(true);
-          } else if (currentScore === 50) {
-            // Speciel Bull regel
-            setMinimumDartsRequired(1);
-            setMaxDartsAllowed(3);
-            setShowDoubleAttemptDartsDialog(true);
-          } else if (currentScore > 40) {
-            // Mellem 41 og 60 (fx 56 -> 20)
-            // Her kan der være brugt 1-3 darts på double
-            setMinimumDartsRequired(1);
-            setMaxDartsAllowed(3);
-            setShowDoubleAttemptDartsDialog(true);
-          } else if (currentScore <= 40) {
-            // Under eller lig med 40
-            if (newScore % 2 === 0) {
-              // Lige score - start med 1 dart
-              setMinimumDartsRequired(1);
-            } else {
-              // Ulige score - start med 2 darts
-              setMinimumDartsRequired(2);
-            }
-            setMaxDartsAllowed(3);
-            setShowDoubleAttemptDartsDialog(true);
-          }
-        } else {
-          // Normal score uden double mulighed
-          onScore(score);
-          setInputValue('');
-        }
-      } else {
-        // Hvis double out ikke er aktiveret
-        onScore(score);
-        setInputValue('');
-      }
-    }
-  };
-
-  const handleCheckoutAttempt = () => {
-    // Sæt score til 0 og brug eksisterende checkout logik
-    setSelectedScore(currentScore);
-    const checkoutInfo = CheckoutValidator.validateCheckout(currentScore, currentScore);
-    if (checkoutInfo.isPossible) {
-      if (checkoutInfo.minimumDarts < 3) {
-        setMinimumDartsRequired(checkoutInfo.minimumDarts);
-        setShowCheckoutDialog(true);
-      } else {
-        setDartsUsed(3);
-        setShowDoubleAttemptDialog(true);
-      }
-    } else {
-      setDartsUsed(3);
-      setShowDoubleAttemptDialog(true);
-    }
-    setInputValue('');
-    setIsCheckoutGuideVisible(false);
-  };
-
-  // Opdater useEffect til at håndtere checkout guide visibility
-  useEffect(() => {
-    if (gameConfig.useDoubles && currentScore <= 170) {
-      const checkoutInfo = CheckoutValidator.checkPossibleDoubleAttempt(currentScore, 0);
-      if (checkoutInfo.possibleDoubleAttempt && checkoutInfo.checkoutRoute) {
-        setIsCheckoutGuideVisible(true);
-      } else {
-        setIsCheckoutGuideVisible(false);
-      }
-    } else {
-      setIsCheckoutGuideVisible(false);
-    }
-  }, [currentScore, gameConfig.useDoubles]);
-
-  const handleCheckoutConfirm = (darts: number) => {
-    setDartsUsed(darts);
-    if (darts === 1) {
-      // Ved 1 dart, gå direkte til double bekræftelse
-      setShowCheckoutDialog(false);
-      setShowDoubleAttemptDialog(true);
-    } else if (darts === 2) {
-      // Ved 2 darts, spørg om double bekræftelse
-      setShowCheckoutDialog(false);
-      setShowDoubleAttemptDialog(true);
-    } else {
-      // Ved 3 darts, spørg om antal double forsøg
-      setShowCheckoutDialog(false);
-      setShowDoubleCountDialog(true);
-    }
-  };
-
-  const handleDoubleAttemptResponse = (hadDoubleAttempt: boolean) => {
-    if (currentScore - selectedScore === 0) {
-      // Dette er en checkout
-      onScore(selectedScore, dartsUsed, hadDoubleAttempt ? 1 : 0);
-    } else {
-      // Dette er et double forsøg uden checkout
-      onScore(selectedScore, undefined, hadDoubleAttempt ? 1 : 0);
-    }
-    setInputValue('');
-    setShowDoubleAttemptDialog(false);
-    setDartsUsed(0);
-  };
-
-  const handleDoubleCountResponse = (doublesAttempted: number) => {
-    onScore(selectedScore, dartsUsed, doublesAttempted);
-    setInputValue('');
-    setShowDoubleCountDialog(false);
-    setDartsUsed(0);
-  };
-
-  const handleDoubleAttemptDartsConfirm = (darts: number) => {
-    // Registrer scoren direkte med det valgte antal double-forsøg
-    onScore(selectedScore, undefined, darts);
-    setInputValue('');
-    setShowDoubleAttemptDartsDialog(false);
-  };
-
-  const handleUndo = () => {
-    // Hvis der er input, fjern sidste ciffer - ellers nulstil
-    if (inputValue.length > 0) {
-      setInputValue(inputValue.slice(0, -1));
-    }
-  };
-
-  const handleBust = () => {
-    if (inputValue && parseInt(inputValue) < currentScore) {
-      // Hvis inputValue er mindre end currentScore, sæt scoren til inputValue
-      const remainingScore = parseInt(inputValue);
-      const difference = currentScore - remainingScore;
-      onScore(difference);
-    } else {
-      // Ellers normal BUST funktion
-      onScore(0);
-    }
-    setInputValue('');
   };
 
   return (
-    <Box 
-      className="css-32cva3"
-      sx={{ 
-        bgcolor: '#2c3e50',
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden'
-      }}
-    >
-      <Box 
-        className="css-zyhaz9"
-        sx={{ 
-          display: 'flex',
-          alignItems: 'center',
-          height: 48,
-          minHeight: 48,
-          bgcolor: '#34495e'
-        }}
-      >
-        <Button
-          className="css-1eyrzcg-MuiButtonBase-root-MuiButton-root"
-          sx={{ 
-            color: 'white',
-            minWidth: 48,
-            height: 48,
-            borderRadius: 0,
-            '&:hover': {
-              bgcolor: 'rgba(255,255,255,0.1)'
-            }
-          }}
-          onClick={handleUndo}
-        >
+    <StyledInputContainer>
+      <StyledInputHeader>
+        <StyledUndoButton onClick={handleUndo}>
           <UndoIcon />
-        </Button>
+        </StyledUndoButton>
 
-        <Box 
-          className="css-e3ejpk"
-          sx={{ 
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-        >
-          <Typography 
-            variant="h6" 
-            className="css-1oktaii-MuiTypography-root"
-            sx={{ 
-              color: 'white',
-              fontWeight: 400,
-              fontSize: {
-                xs: '1.5rem',    // Mobile (< 600px)
-                sm: '1.75rem',   // Tablet (600px-900px)
-                md: '2rem'       // Desktop (900px+)
-              }
-            }}
-          >
-            {inputValue || '0'}
-          </Typography>
-        </Box>
+        <StyledScoreDisplay>
+          {inputScore || '0'}
+        </StyledScoreDisplay>
 
-        <Button
-          className="css-79do5w-MuiButtonBase-root-MuiButton-root"
-          sx={{ 
-            color: inputValue && parseInt(inputValue) < currentScore ? '#4caf50' : '#ff5722', // Grøn for REMAINING, rød for BUST
-            minWidth: 48,
-            height: 48,
-            borderRadius: 0,
-            fontSize: {
-              xs: '1rem',    // Mobile (< 600px)
-              sm: '1.2rem',  // Tablet (600px-900px)
-              md: '1.4rem'   // Desktop (900px+)
-            },
-            '&:hover': {
-              bgcolor: 'rgba(255,255,255,0.1)'
-            }
-          }}
+        <StyledActionButton
           onClick={handleBust}
+          sx={{ 
+            borderRadius: 0,
+            color: inputScore && parseInt(inputScore) < currentScore 
+              ? 'success.main'
+              : 'error.main'
+          }}
         >
-          {inputValue && parseInt(inputValue) < currentScore ? 'REMAINING' : 'BUST'}
-        </Button>
-      </Box>
+          {inputScore && parseInt(inputScore) < currentScore ? 'REMAINING' : 'BUST'}
+        </StyledActionButton>
+      </StyledInputHeader>
 
-      <Box 
-        className="css-1g1k6ds"
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
-          gridTemplateRows: 'repeat(4, 1fr)',
-          flex: 1,
-          bgcolor: '#2c3e50',
-          overflow: 'hidden'
-        }}
-      >
+      <StyledNumberPad>
         {shortcutScores.map((score, index) => {
           const isAction = score === 'Clear' || score === 'Ok';
           const isFixedScore = typeof score === 'number' && fixedScores.includes(score);
           const isDigit = typeof score === 'number' && !isFixedScore && score >= 0 && score <= 9;
           
-          // Fastlæg farven baseret på knappetype
-          let color;
-          if (score === 'Clear') {
-            color = '#ff5722';
-          } else if (score === 'Ok') {
-            color = '#4caf50';
-          } else if (isFixedScore || isDigit) {
-            color = 'rgba(255, 255, 255, 0.8)'; // Lysere farve for faste scores og cifre
-          } else {
-            color = 'rgba(255, 255, 255, 0.5)'; // Kun for andre elementer
-          }
-          
-          const className = score === 'Clear' ? "css-17e7aez-MuiButtonBase-root-MuiButton-root" : 
-                           score === 'Ok' ? "css-927pyo-MuiButtonBase-root-MuiButton-root" : 
-                           "css-1uzdr2z-MuiButtonBase-root-MuiButton-root";
-          
           return (
-            <Button
+            <StyledActionButton
               key={index}
-              className={className}
               onClick={() => handleNumberClick(score)}
+              isFixedScore={isFixedScore}
+              isAction={isAction}
+              className={isDigit ? 'digit-button' : isFixedScore ? 'fixed-score-button' : ''}
               sx={{ 
-                color: color,
-                bgcolor: isFixedScore ? '#2e4058' : '#34495e', // Mørkere blå for faste scores
-                height: '100%',
-                borderRadius: 0,
-                border: '1px solid #1f2d3d', // Tilføj border til alle knapper
-                userSelect: 'none',
-                fontSize: {
-                  xs: isDigit ? '1.25rem' : '1rem',    // Mobile (< 600px)
-                  sm: isDigit ? '1.5rem' : '1.25rem',  // Tablet (600px-900px)
-                  md: isDigit ? '2rem' : '1.5rem'      // Desktop (900px+)
-                },
-                fontWeight: (isFixedScore || isDigit) ? 700 : 400, // Fremhævet skrifttype for cifre og faste scores
-                '&:hover': {
-                  bgcolor: isFixedScore ? '#364c64' : 'rgba(255,255,255,0.1)'
-                }
+                color: score === 'Clear' 
+                  ? 'error.main'
+                  : score === 'Ok'
+                  ? 'success.main'
+                  : 'text.primary'
               }}
             >
-              {score === 'Ok' ? (isCheckoutGuideVisible ? 'CHECK' : 'Ok') : score}
-            </Button>
+              {score === 'Ok' ? 'Ok' : score}
+            </StyledActionButton>
           );
         })}
-      </Box>
+      </StyledNumberPad>
 
-      {/* Dialog for antal darts brugt (under 60) */}
-      <Dialog 
-        open={showCheckoutDialog} 
-        onClose={() => setShowCheckoutDialog(false)}
-        PaperProps={{
-          sx: {
-            bgcolor: '#2c3e50',
-            color: 'white'
-          }
-        }}
-      >
-        <DialogTitle sx={{ 
-          fontSize: {
-            xs: '1.5rem',
-            sm: '1.75rem',
-            md: '2rem'
-          }
-        }}>
-          Antal darts brugt
-        </DialogTitle>
-        <DialogContent>
-          <Typography sx={{
-            fontSize: {
-              xs: '1.2rem',
-              sm: '1.35rem',
-              md: '1.5rem'
-            }
-          }}>
-            Hvor mange darts blev brugt på at lukke?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          {[1, 2, 3].map((darts) => (
-            darts >= minimumDartsRequired && (
-              <Button 
-                key={darts}
-                onClick={() => handleCheckoutConfirm(darts)}
-                sx={{ 
-                  color: 'white',
-                  fontSize: {
-                    xs: '1rem',
-                    sm: '1.2rem',
-                    md: '1.4rem'
-                  }
-                }}
-              >
-                {darts} {darts === 1 ? 'Dart' : 'Darts'}
-              </Button>
-            )
-          ))}
-        </DialogActions>
-      </Dialog>
-
-      {/* Dialog for double forsøg */}
-      <Dialog 
-        open={showDoubleAttemptDialog} 
-        onClose={() => {
-          setShowDoubleAttemptDialog(false);
-          setDartsUsed(0);
-        }}
-        PaperProps={{
-          sx: {
-            bgcolor: '#2c3e50',
-            color: 'white'
-          }
-        }}
-      >
-        <DialogTitle sx={{ 
-          fontSize: {
-            xs: '1.5rem',
-            sm: '1.75rem',
-            md: '2rem'
-          }
-        }}>
-          {currentScore - selectedScore === 0 ? 'Bekræft Checkout' : 'Double Forsøg'}
-        </DialogTitle>
-        <DialogContent>
-          <Typography sx={{
-            fontSize: {
-              xs: '1.2rem',
-              sm: '1.35rem',
-              md: '1.5rem'
-            }
-          }}>
-            {currentScore - selectedScore === 0 
-              ? `Godkend lukning af leg med ${dartsUsed} darts, heraf 1 dart på double?`
-              : 'Var sidste dart brugt som forsøg på double?'
-            }
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={() => handleDoubleAttemptResponse(true)}
-            sx={{ 
-              color: 'white',
-              fontSize: {
-                xs: '1rem',
-                sm: '1.2rem',
-                md: '1.4rem'
-              }
-            }}
-          >
-            {currentScore - selectedScore === 0 ? 'Godkend' : 'Ja'}
-          </Button>
-          <Button 
-            onClick={() => handleDoubleAttemptResponse(false)}
-            sx={{ 
-              color: 'white',
-              fontSize: {
-                xs: '1rem',
-                sm: '1.2rem',
-                md: '1.4rem'
-              }
-            }}
-          >
-            {currentScore - selectedScore === 0 ? 'Fortryd' : 'Nej'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Dialog for antal double forsøg (ved 3 darts checkout) */}
-      <Dialog 
-        open={showDoubleCountDialog} 
-        onClose={() => {
-          setShowDoubleCountDialog(false);
-          setDartsUsed(0);
-        }}
-        PaperProps={{
-          sx: {
-            bgcolor: '#2c3e50',
-            color: 'white'
-          }
-        }}
-      >
-        <DialogTitle sx={{ 
-          fontSize: {
-            xs: '1.5rem',
-            sm: '1.75rem',
-            md: '2rem'
-          }
-        }}>
-          Antal double forsøg
-        </DialogTitle>
-        <DialogContent>
-          <Typography sx={{
-            fontSize: {
-              xs: '1.2rem',
-              sm: '1.35rem',
-              md: '1.5rem'
-            }
-          }}>
-            Hvor mange af disse darts blev brugt på forsøg mod double?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={() => handleDoubleCountResponse(1)}
-            sx={{ 
-              color: 'white',
-              fontSize: {
-                xs: '1rem',
-                sm: '1.2rem',
-                md: '1.4rem'
-              }
-            }}
-          >
-            1 Dart
-          </Button>
-          <Button 
-            onClick={() => handleDoubleCountResponse(2)}
-            sx={{ 
-              color: 'white',
-              fontSize: {
-                xs: '1rem',
-                sm: '1.2rem',
-                md: '1.4rem'
-              }
-            }}
-          >
-            2 Darts
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Dialog for antal darts brugt ved double-forsøg */}
-      <Dialog 
-        open={showDoubleAttemptDartsDialog} 
-        onClose={() => setShowDoubleAttemptDartsDialog(false)}
-        PaperProps={{
-          sx: {
-            bgcolor: '#2c3e50',
-            color: 'white'
-          }
-        }}
-      >
-        <DialogTitle sx={{ 
-          fontSize: {
-            xs: '1.5rem',
-            sm: '1.75rem',
-            md: '2rem'
-          }
-        }}>
-          Double forsøg
-        </DialogTitle>
-        <DialogContent>
-          <Typography sx={{
-            fontSize: {
-              xs: '1.2rem',
-              sm: '1.35rem',
-              md: '1.5rem'
-            }
-          }}>
-            Hvor mange darts blev brugt på double?
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={() => handleDoubleAttemptDartsConfirm(0)}
-            sx={{ 
-              color: 'white',
-              fontSize: {
-                xs: '1rem',
-                sm: '1.2rem',
-                md: '1.4rem'
-              }
-            }}
-          >
-            Ingen
-          </Button>
-          {[1, 2, 3].map((darts) => (
-            darts >= minimumDartsRequired && darts <= maxDartsAllowed && (
-              <Button 
-                key={darts}
-                onClick={() => handleDoubleAttemptDartsConfirm(darts)}
-                sx={{ 
-                  color: 'white',
-                  fontSize: {
-                    xs: '1rem',
-                    sm: '1.2rem',
-                    md: '1.4rem'
-                  }
-                }}
-              >
-                {darts} {darts === 1 ? 'Dart' : 'Darts'}
-              </Button>
-            )
-          ))}
-        </DialogActions>
-      </Dialog>
-    </Box>
+      {/* Modal håndtering */}
+      {isDartModalOpen && checkLukningResult && (
+        <DartCheckoutModal
+          dartsOptions={checkLukningResult}
+          onSelectDarts={(rest: number, darts: number, doubles: number) => {
+            handleDartSelect(darts);
+          }}
+          onClose={() => setIsDartModalOpen(false)}
+        />
+      )}
+      
+      {isDoubleAttemptModalOpen && (
+        <DoubleAttemptModal
+          checkDartsOptions={checkDartsOptions}
+          onSelectDarts={handleSelectDoubleAttempt}
+          onClose={() => setIsDoubleAttemptModalOpen(false)}
+        />
+      )}
+    </StyledInputContainer>
   );
 };
 
