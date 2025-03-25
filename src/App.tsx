@@ -4,6 +4,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { theme } from './theme';
 import { BrowserRouter } from 'react-router-dom';
 import { GameProvider } from './context/GameContext';
+import { AuthProvider } from './contexts/AuthContext';
 import AppRoutes from './routes/AppRoutes';
 
 function App() {
@@ -11,9 +12,11 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <BrowserRouter>
-        <GameProvider>
-          <AppRoutes />
-        </GameProvider>
+        <AuthProvider>
+          <GameProvider>
+            <AppRoutes />
+          </GameProvider>
+        </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>
   );

@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DndProvider, useDrag, useDrop } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
+import { useAuth } from '../contexts/AuthContext';
+import { User } from 'firebase/auth';
 import {
   Box,
   Button,
@@ -47,21 +47,55 @@ import LoginDialog from '../components/dialogs/LoginDialog';
 import GuestDialog from '../components/dialogs/GuestDialog';
 import BotDialog from '../components/dialogs/BotDialog';
 import FriendDialog from '../components/dialogs/FriendDialog';
-import { GameConfig } from '../types/game';
+import { GameConfig, Player, PlayerType } from '../types/game';
 import SettingsIcon from '@mui/icons-material/Settings';
+import NavigationLayout from '../components/layout/NavigationLayout';
 
-interface Player {
-  id: string;
-  name: string;
-  type: PlayerType;
-  avatar?: string;
-  botDifficulty?: string;
-}
-
-type PlayerType = 'login' | 'guest' | 'bot' | 'friend';
+// Interfaces og typer
 type MatchFormat = 'first' | 'best';
 type Position = 0 | 1 | 2 | 3;
 type SwapDirection = 'next' | 'previous' | 'across';
+
+interface GameSettings {
+  gameType: number;
+  matchFormat: MatchFormat;
+  sets: number;
+  legs: number;
+  formatType: 'legs' | 'sets';
+  formatCount: number;
+  inMode: 'straight' | 'double' | 'triple';
+  outMode: 'double' | 'master' | 'straight';
+  checkoutRate: boolean;
+}
+
+interface PlayerCardProps {
+  player: Player;
+  index: number;
+  onMoveUp: (index: number) => void;
+  onMoveDown: (index: number) => void;
+  onEdit: (index: number) => void;
+  onRemove: (index: number) => void;
+  isHome: boolean;
+  totalPlayers: number;
+  onPlayerTypeChange: (index: number, type: PlayerType) => void;
+}
+
+interface FirebaseUser {
+  displayName: string | null;
+  email: string | null;
+  photoURL: string | null;
+}
+
+interface Friend {
+  id: string;
+  name: string;
+}
+
+interface LoginDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onLoginSuccess: (user: FirebaseUser) => void;
+}
 
 const isBot = (type: PlayerType): type is 'bot' => type === 'bot';
 
@@ -70,298 +104,56 @@ const ItemTypes = {
   PLAYER_CARD: 'playerCard'
 };
 
-interface PlayerCardProps {
-  player: Player;
-  index: number;
-  moveCard: (dragIndex: number, hoverIndex: number) => void;
-  onEdit: (index: number) => void;
-  onRemove: (index: number) => void;
-  isHome: boolean;
-  totalPlayers: number;
-  onPlayerTypeChange: (index: number, type: PlayerType) => void;
-}
-
-// PlayerCard komponent med drag and drop
 const PlayerCard: React.FC<PlayerCardProps> = ({ 
   player, 
   index, 
-  moveCard, 
+  onMoveUp,
+  onMoveDown,
   onEdit, 
   onRemove, 
   isHome, 
   totalPlayers,
   onPlayerTypeChange 
 }) => {
-  const ref = useRef<HTMLDivElement>(null);
+  const theme = useTheme();
   
-  const [{ isDragging }, drag] = useDrag(() => ({
-    type: ItemTypes.PLAYER_CARD,
-    item: { index },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging()
-    })
-  }), [index]);
-
-  const [, drop] = useDrop(() => ({
-    accept: ItemTypes.PLAYER_CARD,
-    hover: (item: { index: number }) => {
-      if (!ref.current) {
-        return;
-      }
-      
-      const dragIndex = item.index;
-      const hoverIndex = index;
-
-      // Don't replace items with themselves
-      if (dragIndex === hoverIndex) {
-        return;
-      }
-
-      moveCard(dragIndex, hoverIndex);
-      item.index = hoverIndex;
-    }
-  }), [index, moveCard]);
-
-  // Kombinér drag og drop refs
-  drag(drop(ref));
-
-  // Beregn card højde baseret på antal spillere (50% højere)
-  const cardHeight = totalPlayers <= 2 
-    ? { xs: '330px', sm: '375px', md: '420px' }  // 50% højere for 2 spillere
-    : { xs: '270px', sm: '300px', md: '330px' }; // 50% højere for 3-4 spillere
-
   return (
-    <div ref={ref} style={{ opacity: isDragging ? 0.5 : 1 }}>
-      <Card 
-        sx={{ 
-          bgcolor: index === 0 ? 'rgba(0, 135, 90, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-          color: 'white',
-          borderRadius: 2,
-          transition: 'all 0.2s ease-in-out',
-          height: cardHeight,
-          cursor: 'move',
-          '&:hover': {
-            bgcolor: index === 0 ? 'rgba(0, 135, 90, 0.15)' : 'rgba(255, 255, 255, 0.08)',
-          }
-        }}
-      >
-        <CardContent sx={{ 
-          height: '100%', 
-          display: 'flex', 
-          flexDirection: 'column',
-          p: { xs: 1, sm: 1.5, md: 2 },
-          '&:last-child': { pb: { xs: 1, sm: 1.5, md: 2 } }
-        }}>
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center',
-            gap: { xs: 1, sm: 1.5 },
-            mb: { xs: 1, sm: 2 }
-          }}>
-            <Avatar 
-              sx={{ 
-                bgcolor: index === 0 ? '#00875A' : 'rgba(255, 255, 255, 0.1)',
-                width: { xs: 48, sm: 56 },
-                height: { xs: 48, sm: 56 }
-              }}
-            >
-              {player.name.charAt(0)}
+    <Card sx={{ 
+      position: 'relative',
+      mb: 1,
+      backgroundColor: theme.palette.background.paper
+    }}>
+      <CardContent>
+        <Box display="flex" alignItems="center" justifyContent="space-between">
+          <Box display="flex" alignItems="center" gap={1}>
+            <Avatar src={player.avatar}>
+              {player.name.charAt(0).toUpperCase()}
             </Avatar>
-            <Box sx={{ 
-              flex: 1,
-              minWidth: 0
-            }}>
-              <Box>
-                <Typography 
-                  component="span" 
-                  sx={{ 
-                    color: '#00875A',
-                    fontSize: '0.75rem',
-                    display: 'block'
-                  }}
-                >
-                  {index === 0 ? 'SPILLER 1' : index === 1 ? 'SPILLER 2' : `SPILLER ${index + 1}`}
-                </Typography>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    fontWeight: 500,
-                    fontSize: { xs: '1rem', sm: '1.25rem' },
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {player.name}
-                </Typography>
-                {player.type === 'login' && (
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
-                      color: 'rgba(255, 255, 255, 0.7)',
-                      display: 'block',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    Rang: #123 • Kampe: 45 • Avg: 45.5
-                  </Typography>
-                )}
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 0.5 }}>
-              {player.type === 'guest' && (
-                <IconButton 
-                  size="small"
-                  onClick={() => onEdit(index)}
-                  sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
-                >
-                  <EditIcon fontSize="small" />
-                </IconButton>
-              )}
-              {totalPlayers > 1 && (
-                <IconButton 
-                  size="small"
-                  onClick={() => onRemove(index)}
-                  sx={{ color: 'rgba(255, 255, 255, 0.7)' }}
-                >
-                  <CloseIcon fontSize="small" />
-                </IconButton>
-              )}
-            </Box>
+            <Typography variant="h6">{player.name}</Typography>
           </Box>
-
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column',
-            gap: 1,
-            mt: 'auto'
-          }}>
-            {player.type === 'login' ? (
-              <Box sx={{ 
-                display: 'flex', 
-                gap: 1, 
-                flexWrap: 'wrap',
-                mb: 1
-              }}>
-                <Box sx={{ 
-                  bgcolor: 'rgba(255, 255, 255, 0.05)', 
-                  p: { xs: 0.75, sm: 1 }, 
-                  borderRadius: 1,
-                  flex: '1 0 auto',
-                  minWidth: { xs: '45%', sm: 'auto' }
-                }}>
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
-                      color: 'rgba(255, 255, 255, 0.7)',
-                      fontSize: { xs: '0.7rem', sm: '0.75rem' }
-                    }}
-                  >
-                    Højeste checkout
-                  </Typography>
-                  <Typography 
-                    variant="h6" 
-                    sx={{ 
-                      color: '#00875A',
-                      fontSize: { xs: '1.1rem', sm: '1.25rem' }
-                    }}
-                  >
-                    167
-                  </Typography>
-                </Box>
-                <Box sx={{ 
-                  bgcolor: 'rgba(255, 255, 255, 0.05)', 
-                  p: { xs: 0.75, sm: 1 }, 
-                  borderRadius: 1,
-                  flex: '1 0 auto',
-                  minWidth: { xs: '45%', sm: 'auto' }
-                }}>
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
-                      color: 'rgba(255, 255, 255, 0.7)',
-                      fontSize: { xs: '0.7rem', sm: '0.75rem' }
-                    }}
-                  >
-                    Bedste leg
-                  </Typography>
-                  <Typography 
-                    variant="h6" 
-                    sx={{ 
-                      color: '#00875A',
-                      fontSize: { xs: '1.1rem', sm: '1.25rem' }
-                    }}
-                  >
-                    15
-                  </Typography>
-                </Box>
-              </Box>
-            ) : (
-              <Box sx={{ flex: 1 }} />
-            )}
-            {index === 0 ? (
-              <>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => onPlayerTypeChange(index, 'login')}
-                  sx={{
-                    color: 'white',
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                    bgcolor: player.type === 'login' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                    '&:hover': {
-                      borderColor: 'rgba(255, 255, 255, 0.3)',
-                      bgcolor: 'rgba(255, 255, 255, 0.1)',
-                    },
-                    textTransform: 'none'
-                  }}
-                >
-                  Log ind
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  onClick={() => onPlayerTypeChange(index, 'guest')}
-                  sx={{
-                    color: 'white',
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                    bgcolor: player.type === 'guest' ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                    '&:hover': {
-                      borderColor: 'rgba(255, 255, 255, 0.3)',
-                      bgcolor: 'rgba(255, 255, 255, 0.1)',
-                    },
-                    textTransform: 'none'
-                  }}
-                >
-                  Gæst
-                </Button>
-              </>
-            ) : (
-              <Button
-                variant="outlined"
-                size="small"
-                onClick={() => onPlayerTypeChange(index, player.type)}
-                sx={{
-                  color: 'white',
-                  borderColor: 'rgba(255, 255, 255, 0.2)',
-                  bgcolor: 'rgba(255, 255, 255, 0.2)',
-                  '&:hover': {
-                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                    bgcolor: 'rgba(255, 255, 255, 0.25)',
-                  },
-                  textTransform: 'none'
-                }}
-              >
-                {player.type === 'login' ? 'Log ind' :
-                 player.type === 'guest' ? 'Gæst' : ''}
-              </Button>
-            )}
+          <Box>
+            <IconButton 
+              onClick={() => onMoveUp(index)}
+              disabled={index === 0}
+            >
+              <ArrowUpwardIcon />
+            </IconButton>
+            <IconButton 
+              onClick={() => onMoveDown(index)}
+              disabled={index === totalPlayers - 1}
+            >
+              <ArrowDownwardIcon />
+            </IconButton>
+            <IconButton onClick={() => onEdit(index)}>
+              <EditIcon />
+            </IconButton>
+            <IconButton onClick={() => onRemove(index)}>
+              <CloseIcon />
+            </IconButton>
           </Box>
-        </CardContent>
-      </Card>
-    </div>
+        </Box>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -435,24 +227,49 @@ const StyledToggleButtonGroup = styled(ToggleButtonGroup)(({ theme }) => ({
 const X01Setup = () => {
   const navigate = useNavigate();
   const theme = useTheme();
+  const { currentUser } = useAuth();
   
   // Player Settings
-  const [players, setPlayers] = useState<Player[]>([
-    { id: '1', name: 'Player 1', type: 'guest' }
-  ]);
+  const [players, setPlayers] = useState<Player[]>(() => {
+    // Hvis der er en logget ind bruger, start med denne som første spiller
+    if (currentUser) {
+      return [
+        { 
+          id: currentUser.uid, 
+          name: currentUser.displayName || 'User', 
+          score: 501, 
+          type: 'user',
+          avatar: currentUser.photoURL || undefined 
+        },
+        { 
+          id: 'guest-2', 
+          name: '', 
+          score: 501, 
+          type: 'guest', 
+          avatar: undefined 
+        }
+      ];
+    }
+    return [
+      { id: 'guest-1', name: '', score: 501, type: 'guest', avatar: undefined },
+      { id: 'guest-2', name: '', score: 501, type: 'guest', avatar: undefined }
+    ];
+  });
   const [selectedPlayer, setSelectedPlayer] = useState<number | null>(null);
   const [editingPlayer, setEditingPlayer] = useState<{index: number, name: string} | null>(null);
   
   // Game Settings
-  const [gameType, setGameType] = useState<number>(501);
-  const [matchFormat, setMatchFormat] = useState<MatchFormat>('first');
-  const [sets, setSets] = useState<number>(1);
-  const [legs, setLegs] = useState<number>(3);
-  const [formatType, setFormatType] = useState<'legs' | 'sets'>('legs');
-  const [formatCount, setFormatCount] = useState(5);
-  const [inMode, setInMode] = useState<'straight' | 'double' | 'triple'>('straight');
-  const [outMode, setOutMode] = useState<'double' | 'master' | 'straight'>('double');
-  const [checkoutRate, setCheckoutRate] = useState(false);
+  const [gameSettings, setGameSettings] = useState<GameSettings>({
+    gameType: 501,
+    matchFormat: 'first',
+    sets: 1,
+    legs: 3,
+    formatType: 'legs',
+    formatCount: 5,
+    inMode: 'straight',
+    outMode: 'double',
+    checkoutRate: false
+  });
 
   // Game settings
   const [startingScore, setStartingScore] = useState<number>(501);
@@ -494,6 +311,14 @@ const X01Setup = () => {
 
   const handleStartingScoreSelect = (value: number) => {
     setStartingScore(value);
+    setGameSettings(prev => ({ ...prev, gameType: value }));
+    // Opdater alle spilleres score
+    setPlayers(currentPlayers => 
+      currentPlayers.map(player => ({
+        ...player,
+        score: value
+      }))
+    );
     setStartingScoreDialogOpen(false);
   };
 
@@ -519,15 +344,16 @@ const X01Setup = () => {
 
   const handleAddGuest = (name: string, save: boolean) => {
     if (selectedPlayer !== null) {
-      const newPlayer = {
-        id: String(Date.now()),
+      const newPlayer: Player = {
+        id: `guest-${Date.now()}`,
         name,
-        type: 'guest' as PlayerType
+        score: gameSettings.gameType,
+        type: 'guest',
+        avatar: undefined
       };
 
       setPlayers(currentPlayers => {
         const newPlayers = [...currentPlayers];
-        // Hvis det er den anden spiller, indsæt i position 2
         if (currentPlayers.length === 1) {
           newPlayers[2] = newPlayer;
         } else {
@@ -539,15 +365,34 @@ const X01Setup = () => {
     setGuestDialogOpen(false);
   };
 
+  const handleLoginSuccess = (user: User) => {
+    if (selectedPlayer !== null) {
+      setPlayers(currentPlayers => {
+        const newPlayers = [...currentPlayers];
+        newPlayers[selectedPlayer] = {
+          id: user.uid,
+          name: user.displayName || 'User',
+          score: gameSettings.gameType,
+          type: 'user',
+          avatar: user.photoURL || undefined
+        };
+        return newPlayers;
+      });
+    }
+    setLoginDialogOpen(false);
+  };
+
   const handleSelectBot = (difficulty: string) => {
     if (selectedPlayer !== null) {
       setPlayers(currentPlayers => {
         const newPlayers = [...currentPlayers];
         newPlayers[selectedPlayer] = {
-          ...newPlayers[selectedPlayer],
+          id: `bot-${Date.now()}`,
           name: `Bot (${difficulty})`,
+          score: gameSettings.gameType,
           type: 'bot',
-          botDifficulty: difficulty
+          botDifficulty: difficulty,
+          avatar: undefined
         };
         return newPlayers;
       });
@@ -557,7 +402,13 @@ const X01Setup = () => {
 
   const handleAddPlayer = () => {
     if (players.length < 4) {
-      setPlayerTypeDialogOpen(true);
+      setPlayers([...players, { 
+        id: `guest-${Date.now()}`,
+        name: '', 
+        score: gameSettings.gameType, 
+        type: 'guest',
+        avatar: undefined
+      }]);
     }
   };
 
@@ -586,63 +437,50 @@ const X01Setup = () => {
   };
 
   const getRequiredWins = () => {
-    if (matchFormat === 'first') return formatCount;
-    return Math.ceil(formatCount / 2);
+    if (gameSettings.matchFormat === 'first') return gameSettings.formatCount;
+    return Math.ceil(gameSettings.formatCount / 2);
   };
 
   const handleStartGame = () => {
-    // Validér at der er mindst 2 spillere
-    if (players.length < 2) {
-      alert('Der skal være mindst 2 spillere for at starte spillet');
-      return;
+    if (players.every(player => player.name.trim())) {
+      const gameConfig: GameConfig = {
+        players: players.map(player => ({
+          ...player,
+          score: startingScore // Brug startingScore i stedet for gameType
+        })),
+        gameType: startingScore, // Brug startingScore her også
+        startingScore: startingScore,
+        matchFormat: gameSettings.matchFormat,
+        sets: gameSettings.sets,
+        legs: gameSettings.legs,
+        legsPerSet: gameSettings.legs,
+        inMode: gameSettings.inMode,
+        outMode: gameSettings.outMode,
+        isTraining,
+        scoreAnnouncer,
+        randomStart,
+        showCheckout,
+        useDoubles
+      };
+      
+      navigate('/x01game', { state: { gameConfig } });
     }
-
-    const gameConfig: GameConfig = {
-      // Spillere
-      players: players.map(player => ({
-        id: player.id,
-        name: player.name,
-        type: player.type,
-        botDifficulty: player.botDifficulty,
-        avatar: player.avatar
-      })),
-      
-      // Spil indstillinger
-      startingScore: gameType,
-      matchFormat: matchFormat,
-      sets: sets > 1 ? sets : 1, // Kun brug sets hvis større end 1
-      legs: sets > 1 ? legs : formatCount, // Brug legs som format hvis sets = 1
-      startingIn: inMode,
-      outMode: outMode,
-      legsPerSet: legs,
-      
-      // Spil muligheder
-      isTraining,
-      scoreAnnouncer,
-      randomStart,
-      
-      // Checkout muligheder
-      showCheckout,
-      useDoubles: outMode === 'double',
-    };
-
-    navigate('/x01game', { state: gameConfig });
   };
 
-  const moveCard = (dragIndex: number, hoverIndex: number) => {
-    const newPlayers = [...players];
-    const draggedPlayer = newPlayers[dragIndex];
-    
-    // Hvis det er den anden spiller der tilføjes, placer den i højre kolonne
-    if (newPlayers.length === 2 && dragIndex === 1) {
-      newPlayers.splice(dragIndex, 1);
-      newPlayers.splice(2, 0, draggedPlayer);
-    } else {
-      newPlayers.splice(dragIndex, 1);
-      newPlayers.splice(hoverIndex, 0, draggedPlayer);
+  const handleMoveUp = (index: number) => {
+    if (index > 0) {
+      const newPlayers = [...players];
+      [newPlayers[index - 1], newPlayers[index]] = [newPlayers[index], newPlayers[index - 1]];
+      setPlayers(newPlayers);
     }
-    
-    setPlayers(newPlayers);
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index < players.length - 1) {
+      const newPlayers = [...players];
+      [newPlayers[index], newPlayers[index + 1]] = [newPlayers[index + 1], newPlayers[index]];
+      setPlayers(newPlayers);
+    }
   };
 
   const handleEditPlayer = (index: number) => {
@@ -666,6 +504,31 @@ const X01Setup = () => {
     }
   };
 
+  const handleMatchFormatChange = (prev: GameSettings): GameSettings => ({ 
+    ...prev, 
+    matchFormat: 'first' as MatchFormat 
+  });
+
+  const handleSetsChange = (prev: GameSettings, value: number): GameSettings => ({ 
+    ...prev, 
+    sets: value 
+  });
+
+  const handleLegsChange = (prev: GameSettings, value: number): GameSettings => ({ 
+    ...prev, 
+    legs: value 
+  });
+
+  const handleInModeChange = (prev: GameSettings): GameSettings => ({ 
+    ...prev, 
+    inMode: 'straight' as 'straight' | 'double' | 'triple'
+  });
+
+  const handleOutModeChange = (prev: GameSettings): GameSettings => ({ 
+    ...prev, 
+    outMode: 'double' as 'double' | 'master' | 'straight'
+  });
+
   return (
     <Box sx={{ 
       bgcolor: theme.palette.background.default,
@@ -673,144 +536,51 @@ const X01Setup = () => {
       p: 2,
       color: theme.palette.text.primary
     }}>
-      <Container maxWidth="md">
-        <DndProvider backend={HTML5Backend}>
-          <StyledPaper>
-            {/* Header sektion */}
-            <Box sx={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              mb: 2
-            }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <SettingsIcon sx={{ color: theme.palette.primary.main }} />
-                <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                  Spilleropsætning
-                </Typography>
-              </Box>
-              
-              {players.length < 4 && (
-                <Tooltip title="Tilføj spiller" arrow>
-                  <StyledButton
-                    onClick={handleAddPlayer}
-                    startIcon={<PersonAddIcon />}
-                  >
-                    Tilføj spiller
-                  </StyledButton>
-                </Tooltip>
-              )}
+      <Container maxWidth="sm">
+        <StyledPaper>
+          {/* Header sektion */}
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            mb: 2
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <SettingsIcon sx={{ color: theme.palette.primary.main }} />
+              <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                Spilleropsætning
+              </Typography>
             </Box>
-
-            <Box sx={{ 
-              display: 'flex',
-              gap: { xs: 1, sm: 1.5, md: 2 },
-              height: '100%',
-              minHeight: { xs: '320px', sm: '360px' },
-              mx: 'auto',
-              maxWidth: '100%',
-              pt: 5
-            }}>
-              {/* Venstre kolonne */}
-              <Box sx={{ 
-                flex: '1 1 0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: { xs: 1, sm: 1.5, md: 2 },
-                height: '100%',
-                justifyContent: 'center',
-                minWidth: 0 // Vigtigt for at forhindre overflow
-              }}>
-                {players.slice(0, 1).map((player, index) => (
-                  <PlayerCard
-                    key={player.id}
-                    player={player}
-                    index={index}
-                    moveCard={moveCard}
-                    onEdit={handleEditPlayer}
-                    onRemove={handleRemovePlayer}
-                    isHome={true}
-                    totalPlayers={players.length}
-                    onPlayerTypeChange={handlePlayerTypeChange}
-                  />
-                ))}
-              </Box>
-
-              {/* Midter kolonne */}
-              <Box sx={{ 
-                flex: '0 0 auto',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                px: { xs: 1, sm: 2 }
-              }}>
-                <Box 
-                  sx={{ 
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: { xs: '50px', sm: '60px', md: '80px' },
-                    height: { xs: '50px', sm: '60px', md: '80px' },
-                    borderRadius: '50%',
-                    bgcolor: 'rgba(255, 255, 255, 0.05)',
-                    color: '#00875A'
-                  }}
-                >
-                  <SportsKabaddiIcon sx={{ fontSize: { xs: 24, sm: 30, md: 40 } }} />
-                </Box>
-              </Box>
-
-              {/* Højre kolonne */}
-              <Box sx={{ 
-                flex: '1 1 0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: { xs: 1, sm: 1.5, md: 2 },
-                height: '100%',
-                justifyContent: 'center',
-                minWidth: 0 // Vigtigt for at forhindre overflow
-              }}>
-                {players.slice(1).map((player, index) => (
-                  <PlayerCard
-                    key={player.id}
-                    player={player}
-                    index={index + 1}
-                    moveCard={moveCard}
-                    onEdit={(i) => handleEditPlayer(i + 1)}
-                    onRemove={(i) => handleRemovePlayer(i + 1)}
-                    isHome={false}
-                    totalPlayers={players.length}
-                    onPlayerTypeChange={handlePlayerTypeChange}
-                  />
-                ))}
-              </Box>
-            </Box>
-
+            
             {players.length < 4 && (
-              <Box sx={{ 
-                display: 'flex', 
-                justifyContent: 'flex-end', 
-                alignItems: 'center', 
-                mt: { xs: 1, sm: 2 },
-                gap: 2
-              }}>
-                <Typography>Random player start</Typography>
-                <Switch 
-                  checked={randomStart}
-                  onChange={(e) => setRandomStart(e.target.checked)}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': {
-                      color: '#00875A',
-                    },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                      backgroundColor: '#00875A',
-                    },
-                  }}
-                />
-              </Box>
+              <Tooltip title="Tilføj spiller" arrow>
+                <StyledButton
+                  onClick={handleAddPlayer}
+                  startIcon={<PersonAddIcon />}
+                >
+                  Tilføj spiller
+                </StyledButton>
+              </Tooltip>
             )}
-          </StyledPaper>
-        </DndProvider>
+          </Box>
+
+          <Box sx={{ mt: 2 }}>
+            {players.map((player, index) => (
+              <PlayerCard
+                key={player.id}
+                player={player}
+                index={index}
+                onMoveUp={handleMoveUp}
+                onMoveDown={handleMoveDown}
+                onEdit={handleEditPlayer}
+                onRemove={handleRemovePlayer}
+                isHome={index < Math.ceil(players.length / 2)}
+                totalPlayers={players.length}
+                onPlayerTypeChange={handlePlayerTypeChange}
+              />
+            ))}
+          </Box>
+        </StyledPaper>
 
         {/* Game Settings */}
         <StyledPaper>
@@ -867,7 +637,7 @@ const X01Setup = () => {
                   py: 1
                 }}
               >
-                {matchFormat === 'first' ? 'First to' : 'Best of'}
+                {gameSettings.matchFormat === 'first' ? 'First to' : 'Best of'}
               </Button>
             </Box>
           </Box>
@@ -900,7 +670,7 @@ const X01Setup = () => {
                   py: 1
                 }}
               >
-                {`${sets} set${sets > 1 ? 's' : ''}`}
+                {`${gameSettings.sets} set${gameSettings.sets > 1 ? 's' : ''}`}
               </Button>
               <Button
                 variant="outlined"
@@ -918,7 +688,7 @@ const X01Setup = () => {
                   py: 1
                 }}
               >
-                {`${legs} leg${legs > 1 ? 's' : ''}`}
+                {`${gameSettings.legs} leg${gameSettings.legs > 1 ? 's' : ''}`}
               </Button>
             </Box>
           </Box>
@@ -947,7 +717,7 @@ const X01Setup = () => {
                   py: 1
                 }}
               >
-                {startingIn === 'straight' ? 'Straight in' : 'Double in'}
+                {gameSettings.inMode === 'straight' ? 'Straight in' : 'Double in'}
               </Button>
             </Box>
           </Box>
@@ -977,7 +747,7 @@ const X01Setup = () => {
                   mb: 2
                 }}
               >
-                {outMode === 'double' ? 'Double out' : 'Kommer snart'}
+                {gameSettings.outMode === 'double' ? 'Double out' : 'Kommer snart'}
               </Button>
             </Box>
           </Box>
@@ -1295,7 +1065,7 @@ const X01Setup = () => {
             <Box sx={{ display: 'flex', flexDirection: 'column' }}>
               <Button
                 onClick={() => {
-                  setMatchFormat('first');
+                  setGameSettings(handleMatchFormatChange);
                   setMatchFormatDialogOpen(false);
                 }}
                 sx={{
@@ -1308,7 +1078,7 @@ const X01Setup = () => {
                   '&:hover': {
                     bgcolor: 'rgba(255, 255, 255, 0.1)',
                   },
-                  ...(matchFormat === 'first' && {
+                  ...(gameSettings.matchFormat === 'first' && {
                     bgcolor: 'rgba(255, 255, 255, 0.15)',
                   }),
                   gap: 2
@@ -1320,13 +1090,13 @@ const X01Setup = () => {
                     height: 20,
                     borderRadius: '50%',
                     border: '2px solid',
-                    borderColor: matchFormat === 'first' ? '#00875A' : 'rgba(255, 255, 255, 0.5)',
+                    borderColor: gameSettings.matchFormat === 'first' ? '#00875A' : 'rgba(255, 255, 255, 0.5)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}
                 >
-                  {matchFormat === 'first' && (
+                  {gameSettings.matchFormat === 'first' && (
                     <Box
                       sx={{
                         width: 12,
@@ -1341,7 +1111,7 @@ const X01Setup = () => {
               </Button>
               <Button
                 onClick={() => {
-                  setMatchFormat('best');
+                  setGameSettings(prev => ({ ...prev, matchFormat: 'best' }));
                   setMatchFormatDialogOpen(false);
                 }}
                 sx={{
@@ -1354,7 +1124,7 @@ const X01Setup = () => {
                   '&:hover': {
                     bgcolor: 'rgba(255, 255, 255, 0.1)',
                   },
-                  ...(matchFormat === 'best' && {
+                  ...(gameSettings.matchFormat === 'best' && {
                     bgcolor: 'rgba(255, 255, 255, 0.15)',
                   }),
                   gap: 2
@@ -1366,13 +1136,13 @@ const X01Setup = () => {
                     height: 20,
                     borderRadius: '50%',
                     border: '2px solid',
-                    borderColor: matchFormat === 'best' ? '#00875A' : 'rgba(255, 255, 255, 0.5)',
+                    borderColor: gameSettings.matchFormat === 'best' ? '#00875A' : 'rgba(255, 255, 255, 0.5)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}
                 >
-                  {matchFormat === 'best' && (
+                  {gameSettings.matchFormat === 'best' && (
                     <Box
                       sx={{
                         width: 12,
@@ -1410,9 +1180,9 @@ const X01Setup = () => {
           <DialogContent>
             <Box>
               <ToggleButtonGroup
-                value={sets}
+                value={gameSettings.sets}
                 exclusive
-                onChange={(_, value) => value && setSets(value)}
+                onChange={(_, value) => value && setGameSettings(prev => ({ ...prev, sets: value }))}
                 sx={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(4, 1fr)',
@@ -1468,9 +1238,9 @@ const X01Setup = () => {
           <DialogContent>
             <Box>
               <ToggleButtonGroup
-                value={legs}
+                value={gameSettings.legs}
                 exclusive
-                onChange={(_, value) => value && setLegs(value)}
+                onChange={(_, value) => value && setGameSettings(prev => ({ ...prev, legs: value }))}
                 sx={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(4, 1fr)',
@@ -1527,7 +1297,7 @@ const X01Setup = () => {
             <Box sx={{ display: 'flex', flexDirection: 'column' }}>
               <Button
                 onClick={() => {
-                  setStartingIn('straight');
+                  setGameSettings(handleInModeChange);
                   setStartingInDialogOpen(false);
                 }}
                 sx={{
@@ -1540,7 +1310,7 @@ const X01Setup = () => {
                   '&:hover': {
                     bgcolor: 'rgba(255, 255, 255, 0.1)',
                   },
-                  ...(startingIn === 'straight' && {
+                  ...(gameSettings.inMode === 'straight' && {
                     bgcolor: 'rgba(255, 255, 255, 0.15)',
                   }),
                   gap: 2
@@ -1552,13 +1322,13 @@ const X01Setup = () => {
                     height: 20,
                     borderRadius: '50%',
                     border: '2px solid',
-                    borderColor: startingIn === 'straight' ? '#00875A' : 'rgba(255, 255, 255, 0.5)',
+                    borderColor: gameSettings.inMode === 'straight' ? '#00875A' : 'rgba(255, 255, 255, 0.5)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}
                 >
-                  {startingIn === 'straight' && (
+                  {gameSettings.inMode === 'straight' && (
                     <Box
                       sx={{
                         width: 12,
@@ -1573,7 +1343,7 @@ const X01Setup = () => {
               </Button>
               <Button
                 onClick={() => {
-                  setStartingIn('double');
+                  setGameSettings(prev => ({ ...prev, inMode: 'double' }));
                   setStartingInDialogOpen(false);
                 }}
                 sx={{
@@ -1586,7 +1356,7 @@ const X01Setup = () => {
                   '&:hover': {
                     bgcolor: 'rgba(255, 255, 255, 0.1)',
                   },
-                  ...(startingIn === 'double' && {
+                  ...(gameSettings.inMode === 'double' && {
                     bgcolor: 'rgba(255, 255, 255, 0.15)',
                   }),
                   gap: 2
@@ -1598,13 +1368,13 @@ const X01Setup = () => {
                     height: 20,
                     borderRadius: '50%',
                     border: '2px solid',
-                    borderColor: startingIn === 'double' ? '#00875A' : 'rgba(255, 255, 255, 0.5)',
+                    borderColor: gameSettings.inMode === 'double' ? '#00875A' : 'rgba(255, 255, 255, 0.5)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}
                 >
-                  {startingIn === 'double' && (
+                  {gameSettings.inMode === 'double' && (
                     <Box
                       sx={{
                         width: 12,
@@ -1643,7 +1413,7 @@ const X01Setup = () => {
             <Box sx={{ display: 'flex', flexDirection: 'column' }}>
               <Button
                 onClick={() => {
-                  setOutMode('double');
+                  setGameSettings(handleOutModeChange);
                   setOutRulesDialogOpen(false);
                 }}
                 sx={{
@@ -1656,7 +1426,7 @@ const X01Setup = () => {
                   '&:hover': {
                     bgcolor: 'rgba(255, 255, 255, 0.1)',
                   },
-                  ...(outMode === 'double' && {
+                  ...(gameSettings.outMode === 'double' && {
                     bgcolor: 'rgba(255, 255, 255, 0.15)',
                   }),
                   gap: 2
@@ -1668,13 +1438,13 @@ const X01Setup = () => {
                     height: 20,
                     borderRadius: '50%',
                     border: '2px solid',
-                    borderColor: outMode === 'double' ? '#00875A' : 'rgba(255, 255, 255, 0.5)',
+                    borderColor: gameSettings.outMode === 'double' ? '#00875A' : 'rgba(255, 255, 255, 0.5)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}
                 >
-                  {outMode === 'double' && (
+                  {gameSettings.outMode === 'double' && (
                     <Box
                       sx={{
                         width: 12,
@@ -1730,6 +1500,7 @@ const X01Setup = () => {
         <LoginDialog 
           open={loginDialogOpen} 
           onClose={() => setLoginDialogOpen(false)} 
+          onLoginSuccess={handleLoginSuccess}
         />
         
         <GuestDialog 
@@ -1747,6 +1518,22 @@ const X01Setup = () => {
         <FriendDialog 
           open={friendDialogOpen} 
           onClose={() => setFriendDialogOpen(false)} 
+          onSelectFriend={(friend) => {
+            if (selectedPlayer !== null) {
+              setPlayers(currentPlayers => {
+                const newPlayers = [...currentPlayers];
+                newPlayers[selectedPlayer] = {
+                  id: friend.id,
+                  name: friend.name,
+                  score: gameSettings.gameType,
+                  type: 'friend',
+                  avatar: friend.avatar
+                };
+                return newPlayers;
+              });
+            }
+            setFriendDialogOpen(false);
+          }}
         />
       </Container>
     </Box>

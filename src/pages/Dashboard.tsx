@@ -5,6 +5,7 @@ import SportsScoreIcon from '@mui/icons-material/SportsScore';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import SettingsIcon from '@mui/icons-material/Settings';
 import PersonIcon from '@mui/icons-material/Person';
+import NavigationLayout from '../components/layout/NavigationLayout';
 
 // Styled components
 const StyledPaper = styled(Paper)(({ theme }) => ({
@@ -78,132 +79,133 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   return (
-    <Box sx={{ 
-      bgcolor: theme => theme.palette.background.default,
-      minHeight: '100vh',
-      py: 4
-    }}>
-      <Container maxWidth="lg">
-        {/* Header */}
-        <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <StyledAvatar>
-            <PersonIcon />
-          </StyledAvatar>
-          <Box>
-            <Typography variant="h4" sx={{ fontWeight: 500 }}>
-              Velkommen tilbage!
-            </Typography>
-            <Typography 
-              variant="subtitle1" 
-              sx={{ color: 'text.secondary' }}
-            >
-              Klar til at spille dart?
-            </Typography>
-          </Box>
-        </Box>
-
-        <Grid container spacing={3}>
-          {/* Hurtig Start Sektion */}
-          <Grid item xs={12} md={8}>
-            <StyledPaper sx={{ mb: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-                <SportsScoreIcon sx={{ color: 'primary.main' }} />
-                <Typography variant="h5" sx={{ fontWeight: 500 }}>
-                  Hurtig Start
-                </Typography>
-              </Box>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <StyledActionButton
-                    variant="contained"
-                    fullWidth
-                    onClick={() => navigate('/local')}
-                    startIcon={<SportsScoreIcon />}
-                  >
-                    Start Nyt Spil
-                  </StyledActionButton>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <StyledActionButton
-                    variant="outlined"
-                    fullWidth
-                    disabled
-                    startIcon={<EmojiEventsIcon />}
-                  >
-                    Start Turnering
-                  </StyledActionButton>
-                </Grid>
-              </Grid>
-            </StyledPaper>
-
-            {/* Seneste Spil */}
-            <StyledPaper>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-                <EmojiEventsIcon sx={{ color: 'primary.main' }} />
-                <Typography variant="h5" sx={{ fontWeight: 500 }}>
-                  Seneste Spil
-                </Typography>
-              </Box>
-              <Typography sx={{ color: 'text.secondary' }}>
-                Du har ikke spillet nogen spil endnu.
+    <NavigationLayout>
+      <Box sx={{ 
+        bgcolor: theme => theme.palette.background.default,
+        minHeight: '100vh'
+      }}>
+        <Container maxWidth="lg">
+          {/* Header */}
+          <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
+            <StyledAvatar>
+              <PersonIcon />
+            </StyledAvatar>
+            <Box>
+              <Typography variant="h4" sx={{ fontWeight: 500 }}>
+                Velkommen tilbage!
               </Typography>
-            </StyledPaper>
-          </Grid>
-
-          {/* Sidepanel */}
-          <Grid item xs={12} md={4}>
-            {/* Statistik Kort */}
-            <StyledPaper sx={{ mb: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-                <SportsScoreIcon sx={{ color: 'primary.main' }} />
-                <Typography variant="h5" sx={{ fontWeight: 500 }}>
-                  Dine Statistikker
-                </Typography>
-              </Box>
-              <Box sx={{ 
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 1
-              }}>
-                <Typography sx={{ color: 'text.secondary' }}>
-                  Spil i alt: 0
-                </Typography>
-                <Typography sx={{ color: 'text.secondary' }}>
-                  Gennemsnitlig score: -
-                </Typography>
-                <Typography sx={{ color: 'text.secondary' }}>
-                  Bedste checkout: -
-                </Typography>
-              </Box>
-            </StyledPaper>
-
-            {/* Indstillinger Kort */}
-            <StyledPaper>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-                <SettingsIcon sx={{ color: 'primary.main' }} />
-                <Typography variant="h5" sx={{ fontWeight: 500 }}>
-                  Hurtige Links
-                </Typography>
-              </Box>
-              <StyledQuickLink
-                fullWidth
-                startIcon={<SettingsIcon />}
-                disabled
+              <Typography 
+                variant="subtitle1" 
+                sx={{ color: 'text.secondary' }}
               >
-                Indstillinger
-              </StyledQuickLink>
-              <StyledQuickLink
-                fullWidth
-                startIcon={<EmojiEventsIcon />}
-                disabled
-              >
-                Achievements
-              </StyledQuickLink>
-            </StyledPaper>
+                Klar til at spille dart?
+              </Typography>
+            </Box>
+          </Box>
+
+          <Grid container spacing={3}>
+            {/* Hurtig Start Sektion */}
+            <Grid item xs={12} md={8}>
+              <StyledPaper sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                  <SportsScoreIcon sx={{ color: 'primary.main' }} />
+                  <Typography variant="h5" sx={{ fontWeight: 500 }}>
+                    Hurtig Start
+                  </Typography>
+                </Box>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <StyledActionButton
+                      variant="contained"
+                      fullWidth
+                      onClick={() => navigate('/local')}
+                      startIcon={<SportsScoreIcon />}
+                    >
+                      Start Nyt Spil
+                    </StyledActionButton>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <StyledActionButton
+                      variant="outlined"
+                      fullWidth
+                      disabled
+                      startIcon={<EmojiEventsIcon />}
+                    >
+                      Start Turnering
+                    </StyledActionButton>
+                  </Grid>
+                </Grid>
+              </StyledPaper>
+
+              {/* Seneste Spil */}
+              <StyledPaper>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                  <EmojiEventsIcon sx={{ color: 'primary.main' }} />
+                  <Typography variant="h5" sx={{ fontWeight: 500 }}>
+                    Seneste Spil
+                  </Typography>
+                </Box>
+                <Typography sx={{ color: 'text.secondary' }}>
+                  Du har ikke spillet nogen spil endnu.
+                </Typography>
+              </StyledPaper>
+            </Grid>
+
+            {/* Sidepanel */}
+            <Grid item xs={12} md={4}>
+              {/* Statistik Kort */}
+              <StyledPaper sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                  <SportsScoreIcon sx={{ color: 'primary.main' }} />
+                  <Typography variant="h5" sx={{ fontWeight: 500 }}>
+                    Dine Statistikker
+                  </Typography>
+                </Box>
+                <Box sx={{ 
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1
+                }}>
+                  <Typography sx={{ color: 'text.secondary' }}>
+                    Spil i alt: 0
+                  </Typography>
+                  <Typography sx={{ color: 'text.secondary' }}>
+                    Gennemsnitlig score: -
+                  </Typography>
+                  <Typography sx={{ color: 'text.secondary' }}>
+                    Bedste checkout: -
+                  </Typography>
+                </Box>
+              </StyledPaper>
+
+              {/* Indstillinger Kort */}
+              <StyledPaper>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                  <SettingsIcon sx={{ color: 'primary.main' }} />
+                  <Typography variant="h5" sx={{ fontWeight: 500 }}>
+                    Hurtige Links
+                  </Typography>
+                </Box>
+                <StyledQuickLink
+                  fullWidth
+                  startIcon={<SettingsIcon />}
+                  onClick={() => navigate('/settings')}
+                >
+                  Indstillinger
+                </StyledQuickLink>
+                <StyledQuickLink
+                  fullWidth
+                  startIcon={<EmojiEventsIcon />}
+                  disabled
+                >
+                  Achievements
+                </StyledQuickLink>
+              </StyledPaper>
+            </Grid>
           </Grid>
-        </Grid>
-      </Container>
-    </Box>
+        </Container>
+      </Box>
+    </NavigationLayout>
   );
 };
 

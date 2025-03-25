@@ -1,13 +1,12 @@
 import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-
-// Import pages
 import InfoPage from '../pages/InfoPage';
 import Dashboard from '../pages/Dashboard';
 import Local from '../pages/Local';
 import X01Setup from '../pages/X01Setup';
 import X01Game from '../pages/X01Game';
 import NavigationLayout from '../components/layout/NavigationLayout';
+import ProtectedRoute from '../components/auth/ProtectedRoute';
 
 // Wrapper component for X01Game to handle state
 const X01GameWrapper = () => {
@@ -29,13 +28,48 @@ const AppRoutes = () => {
   return (
     <Routes>
       {/* Public routes */}
-      <Route path="/" element={<InfoPage />} />
+      <Route 
+        path="/" 
+        element={
+          <ProtectedRoute requireAuth={false}>
+            <InfoPage />
+          </ProtectedRoute>
+        } 
+      />
       
       {/* Protected routes with navigation */}
-      <Route path="/dashboard" element={<NavigationLayout><Dashboard /></NavigationLayout>} />
-      <Route path="/local" element={<NavigationLayout><Local /></NavigationLayout>} />
-      <Route path="/x01setup" element={<NavigationLayout><X01Setup /></NavigationLayout>} />
-      <Route path="/x01game" element={<X01GameWrapper />} />
+      <Route 
+        path="/dashboard" 
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/local" 
+        element={
+          <ProtectedRoute>
+            <Local />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/x01setup" 
+        element={
+          <ProtectedRoute>
+            <X01Setup />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/x01game" 
+        element={
+          <ProtectedRoute>
+            <X01GameWrapper />
+          </ProtectedRoute>
+        } 
+      />
       
       {/* Placeholder routes */}
       <Route path="/profile" element={<NavigationLayout><div>Profile Coming Soon</div></NavigationLayout>} />

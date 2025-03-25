@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { Box, Typography, useTheme, useMediaQuery } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
 import ScoreInput from '../components/game/ScoreInput';
 import CheckoutValidator from '../utils/CheckoutValidator';
@@ -159,9 +159,10 @@ const NoStatsMessage = styled(Box)(({ theme }) => ({
 
 const X01Game: React.FC = () => {
   const location = useLocation();
-  const gameConfig = location.state as GameConfig;
+  const gameConfig = location.state?.gameConfig as GameConfig;
   const players = gameConfig?.players?.filter(Boolean) || [];
   const { showingStats } = useGame();
+  const navigate = useNavigate();
 
   const [gameState, dispatch] = useGameState(gameConfig);
   const { currentPlayerIndex, scores, lastThrows, currentLegDarts, currentLegAverage, checkoutGuide } = gameState;
@@ -193,7 +194,7 @@ const X01Game: React.FC = () => {
   const getPlayerById = (id: string) => players.find(player => player?.id === id);
   const getCurrentPlayer = () => players.find((_, index) => index === currentPlayerIndex);
 
-  // Opdater checkout guide når aktiv spiller ændres
+  // Tjek for mulige checkout kombinationer
   useEffect(() => {
     const currentPlayer = getCurrentPlayer();
     if (!currentPlayer?.id) return;
@@ -206,8 +207,8 @@ const X01Game: React.FC = () => {
         dispatch({
           type: 'SET_CHECKOUT_GUIDE',
           guide: {
-          score: currentScore,
-          combinations: [checkoutInfo.checkoutRoute]
+            score: currentScore,
+            combinations: [checkoutInfo.checkoutRoute]
           }
         });
       } else {
@@ -218,6 +219,37 @@ const X01Game: React.FC = () => {
     }
   }, [currentPlayerIndex, scores, gameConfig.useDoubles]);
 
+  // Opdater score når spillet starter
+  useEffect(() => {
+    if (players.length > 0) {
+      const unsetPlayers = players.filter(player => 
+        player?.id && scores[player.id] === undefined
+      );
+      
+      unsetPlayers.forEach(player => {
+        if (player?.id) {
+          dispatch({ 
+            type: 'UPDATE_SCORE', 
+            playerId: player.id, 
+            score: gameConfig.startingScore 
+          });
+        }
+      });
+    }
+  }, [players, scores, gameConfig.startingScore]);
+
+  // Tjek om et set er vundet
+  const shouldUpdateSet = () => {
+    const currentPlayer = getCurrentPlayer();
+    if (!currentPlayer?.id) return false;
+    
+    const playerData = gameState.playerGameData[currentPlayer.id];
+    if (!playerData) return false;
+    
+    const playerLegsWon = playerData.legsWon.length;
+    return playerLegsWon > 0 && playerLegsWon % gameConfig.legsPerSet === 0;
+  };
+
   // Håndter score input
   const handleScore = (score: number, dartsUsed: number = 3, doublesAttempted: number = 0) => {
     const currentPlayer = getCurrentPlayer();
@@ -225,6 +257,12 @@ const X01Game: React.FC = () => {
 
     const currentScore = scores[currentPlayer.id];
     const newScore = currentScore - score;
+
+    // Valider score baseret på spilindstillinger
+    if (gameConfig.outMode === 'double' && newScore === 0 && doublesAttempted === 0) {
+      // Hvis double out er påkrævet, men der ikke blev forsøgt double
+      return;
+    }
 
     // Opdater throw historik
     const throwData: ThrowHistory = {
@@ -255,12 +293,15 @@ const X01Game: React.FC = () => {
       // Reset scores for alle spillere til ny leg
       players.forEach(player => {
         if (player?.id) {
-          dispatch({ type: 'UPDATE_SCORE', playerId: player.id, score: gameConfig.startingScore });
+          dispatch({ 
+            type: 'UPDATE_SCORE', 
+            playerId: player.id, 
+            score: gameConfig.startingScore 
+          });
         }
       });
 
       // Find næste startspiller for den nye leg
-      // Hvis der ikke er random start, så tag næste spiller i rækken
       if (!gameConfig.randomStart) {
         const nextStarterIndex = (currentPlayerIndex + 1) % players.length;
         dispatch({ 
@@ -284,17 +325,13 @@ const X01Game: React.FC = () => {
     }
   };
 
-  // Tjek om et set er vundet
-  const shouldUpdateSet = () => {
-    const currentPlayer = getCurrentPlayer();
-    if (!currentPlayer?.id) return false;
-    
-    const playerData = gameState.playerGameData[currentPlayer.id];
-    if (!playerData) return false;
-    
-    const playerLegsWon = playerData.legsWon.length;
-    return playerLegsWon > 0 && playerLegsWon % gameConfig.legsPerSet === 0;
-  };
+  // Sikkerhedstjek for gameConfig
+  useEffect(() => {
+    if (!gameConfig) {
+      navigate('/local');
+      return;
+    }
+  }, [gameConfig]);
 
   // Render game content
   const renderGameContent = () => {
@@ -303,18 +340,18 @@ const X01Game: React.FC = () => {
       const player2 = players[1];
       
       if (player1?.id && player2?.id) {
-          return (
-            <GameStats 
-              player1={{
-                name: player1.name,
+        return (
+          <GameStats 
+            player1={{
+              name: player1.name,
               stats: { ...playerStats[player1.id], gameData: gameState.playerGameData[player1.id] }
-              }}
-              player2={{
-                name: player2.name,
+            }}
+            player2={{
+              name: player2.name,
               stats: { ...playerStats[player2.id], gameData: gameState.playerGameData[player2.id] }
-              }}
-            />
-          );
+            }}
+          />
+        );
       }
       
       return (
@@ -329,7 +366,7 @@ const X01Game: React.FC = () => {
     const validPlayers = players.filter(player => player?.id);
     
     return (
-      <GameContainer>
+      <>
         <ScoreArea>
           {validPlayers.map((player, index) => {
             if (!player?.id) return null;
@@ -387,7 +424,7 @@ const X01Game: React.FC = () => {
             />
           )}
         </InputArea>
-      </GameContainer>
+      </>
     );
   };
 

@@ -4,15 +4,44 @@ import {
   TextField,
   Button,
   Box,
-  Typography
+  Typography,
+  Alert
 } from '@mui/material';
+import { useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
+import { User } from 'firebase/auth';
 
 interface LoginDialogProps {
   open: boolean;
   onClose: () => void;
+  onLoginSuccess: (user: User) => void;
 }
 
-const LoginDialog = ({ open, onClose }: LoginDialogProps) => {
+const LoginDialog = ({ open, onClose, onLoginSuccess }: LoginDialogProps) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      setError('');
+      setLoading(true);
+      const userCredential = await login(email, password);
+      if (userCredential.user) {
+        onLoginSuccess(userCredential.user);
+      }
+    } catch (err) {
+      setError('Fejl ved login. Kontroller email og adgangskode.');
+      console.error('Login error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Dialog 
       open={open} 
@@ -30,65 +59,81 @@ const LoginDialog = ({ open, onClose }: LoginDialogProps) => {
           <img src="/logo.png" alt="King of Darts" style={{ width: 120 }} />
         </Box>
 
-        <TextField
-          fullWidth
-          label="Email"
-          variant="outlined"
-          margin="normal"
-          sx={{
-            '& .MuiOutlinedInput-root': {
-              color: 'white',
-              '& fieldset': {
-                borderColor: 'rgba(255, 255, 255, 0.2)',
-              },
-              '&:hover fieldset': {
-                borderColor: 'rgba(255, 255, 255, 0.3)',
-              },
-            },
-            '& .MuiInputLabel-root': {
-              color: 'rgba(255, 255, 255, 0.7)',
-            },
-          }}
-        />
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
 
-        <TextField
-          fullWidth
-          label="Password"
-          type="password"
-          variant="outlined"
-          margin="normal"
-          sx={{
-            '& .MuiOutlinedInput-root': {
-              color: 'white',
-              '& fieldset': {
-                borderColor: 'rgba(255, 255, 255, 0.2)',
+        <Box component="form" onSubmit={handleSubmit}>
+          <TextField
+            fullWidth
+            label="Email"
+            variant="outlined"
+            margin="normal"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={loading}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                color: 'white',
+                '& fieldset': {
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'rgba(255, 255, 255, 0.3)',
+                },
               },
-              '&:hover fieldset': {
-                borderColor: 'rgba(255, 255, 255, 0.3)',
+              '& .MuiInputLabel-root': {
+                color: 'rgba(255, 255, 255, 0.7)',
               },
-            },
-            '& .MuiInputLabel-root': {
-              color: 'rgba(255, 255, 255, 0.7)',
-            },
-          }}
-        />
+            }}
+          />
 
-        <Button
-          fullWidth
-          variant="contained"
-          sx={{
-            mt: 3,
-            mb: 2,
-            bgcolor: '#00875A',
-            '&:hover': {
-              bgcolor: '#007A51',
-            },
-            textTransform: 'none',
-            py: 1.5
-          }}
-        >
-          Login
-        </Button>
+          <TextField
+            fullWidth
+            label="Adgangskode"
+            type="password"
+            variant="outlined"
+            margin="normal"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                color: 'white',
+                '& fieldset': {
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'rgba(255, 255, 255, 0.3)',
+                },
+              },
+              '& .MuiInputLabel-root': {
+                color: 'rgba(255, 255, 255, 0.7)',
+              },
+            }}
+          />
+
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            disabled={loading}
+            sx={{
+              mt: 3,
+              mb: 2,
+              bgcolor: '#00875A',
+              '&:hover': {
+                bgcolor: '#007A51',
+              },
+              textTransform: 'none',
+              py: 1.5
+            }}
+          >
+            {loading ? 'Logger ind...' : 'Log ind'}
+          </Button>
+        </Box>
 
         <Typography 
           variant="body2" 
@@ -101,7 +146,7 @@ const LoginDialog = ({ open, onClose }: LoginDialogProps) => {
             }
           }}
         >
-          Forgot Password
+          Glemt adgangskode?
         </Typography>
       </DialogContent>
     </Dialog>

@@ -1,10 +1,14 @@
-import { Box, Button, Container, Typography, Grid, Paper } from '@mui/material';
+import { Box, Button, Container, Typography, Grid, Paper, Dialog } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
+import { useEffect, useState } from 'react';
 import SportsScoreIcon from '@mui/icons-material/SportsScore';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import GroupsIcon from '@mui/icons-material/Groups';
 import DevicesIcon from '@mui/icons-material/Devices';
+import LoginForm from '../components/auth/LoginForm';
+import SignupForm from '../components/auth/SignupForm';
+import { useAuth } from '../contexts/AuthContext';
 
 // Styled components
 const StyledHeroSection = styled(Box)(({ theme }) => ({
@@ -80,6 +84,31 @@ const features = [
 
 const InfoPage = () => {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [signupOpen, setSignupOpen] = useState(false);
+
+  useEffect(() => {
+    if (currentUser) {
+      navigate('/dashboard');
+    }
+  }, [currentUser, navigate]);
+
+  const handleLoginSuccess = () => {
+    setLoginOpen(false);
+    setSignupOpen(false);
+    navigate('/dashboard');
+  };
+
+  const handleLoginClick = () => {
+    setSignupOpen(false);
+    setLoginOpen(true);
+  };
+
+  const handleSignupClick = () => {
+    setLoginOpen(false);
+    setSignupOpen(true);
+  };
 
   return (
     <Box>
@@ -111,12 +140,28 @@ const InfoPage = () => {
               >
                 Brug DartScore til at holde styr på dine scores og statistikker!
               </Typography>
-              <StyledActionButton 
-                variant="contained" 
-                onClick={() => navigate('/dashboard')}
-              >
-                Start Nu!
-              </StyledActionButton>
+              <Box sx={{ display: 'flex', gap: 2 }}>
+                <StyledActionButton 
+                  variant="contained" 
+                  onClick={handleLoginClick}
+                >
+                  Log Ind
+                </StyledActionButton>
+                <StyledActionButton 
+                  variant="outlined"
+                  onClick={handleSignupClick}
+                  sx={{
+                    borderColor: 'common.white',
+                    color: 'common.white',
+                    '&:hover': {
+                      borderColor: 'common.white',
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    }
+                  }}
+                >
+                  Opret Konto
+                </StyledActionButton>
+              </Box>
             </Grid>
             <Grid item xs={12} md={6}>
               {/* Her kunne man tilføje et billede eller illustration */}
@@ -219,6 +264,32 @@ const InfoPage = () => {
           </StyledActionButton>
         </Box>
       </Container>
+
+      {/* Login Dialog */}
+      <Dialog 
+        open={loginOpen} 
+        onClose={() => setLoginOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <LoginForm 
+          onSuccess={handleLoginSuccess}
+          onRegisterClick={handleSignupClick}
+        />
+      </Dialog>
+
+      {/* Signup Dialog */}
+      <Dialog 
+        open={signupOpen} 
+        onClose={() => setSignupOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <SignupForm 
+          onSuccess={handleLoginSuccess}
+          onLoginClick={handleLoginClick}
+        />
+      </Dialog>
     </Box>
   );
 };
