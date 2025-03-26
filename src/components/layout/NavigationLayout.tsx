@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton, ListItemIcon, ListItemText, IconButton, useTheme, useMediaQuery, Dialog, DialogTitle, DialogContent, DialogActions, Button, DrawerProps, CssBaseline } from '@mui/material';
+import { Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton, ListItemIcon, ListItemText, IconButton, useTheme, useMediaQuery, Dialog, DialogTitle, DialogContent, DialogActions, Button, CssBaseline } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useGame } from '../../context/GameContext';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -184,10 +184,11 @@ const NavigationLayout = ({ children }: NavigationLayoutProps) => {
 
   // Update previous location when location changes
   useEffect(() => {
-    if (location.pathname !== previousLocation) {
-      setPreviousLocation(location.pathname);
+    const currentPath = location.pathname;
+    if (currentPath !== previousLocation) {
+      setPreviousLocation(currentPath);
     }
-  }, [location]);
+  }, [location.pathname, previousLocation]);
 
   // Opdateret useEffect - drawer skal forblive lukket på mobile/tablet
   useEffect(() => {
@@ -211,13 +212,17 @@ const NavigationLayout = ({ children }: NavigationLayoutProps) => {
     if (isInGame) {
       setShowGameInterruptDialog(true);
     } else {
-      navigate(-1);
+      if (location.pathname === '/x01game') {
+        navigate('/x01setup');
+      } else {
+        navigate(-1);
+      }
     }
   };
 
   const handleAbortGame = () => {
     setShowGameInterruptDialog(false);
-    navigate('/dashboard');
+    navigate('/x01setup');
   };
 
   const handleNewGame = () => {
@@ -235,6 +240,28 @@ const NavigationLayout = ({ children }: NavigationLayoutProps) => {
 
   const getCurrentPageTitle = () => {
     if (showingStats) return 'Statistik';
+    
+    if (location.pathname === '/x01game') {
+      const gameConfig = location.state?.gameConfig;
+      if (gameConfig) {
+        const matchFormat = gameConfig.matchFormat === 'first' ? 'First to' : 'Best of';
+        const formatType = gameConfig.formatType;
+        const formatCount = gameConfig.formatCount;
+        const inMode = gameConfig.inMode === 'straight' ? 'Single in' : 'Double in';
+        const outMode = gameConfig.outMode === 'double' ? 'Double out' : 'Straight out';
+        
+        // Byg titel baseret på format type
+        let formatText = '';
+        if (formatType === 'legs') {
+          formatText = `${formatCount} ${formatCount === 1 ? 'leg' : 'legs'}`;
+        } else {
+          formatText = `${formatCount} ${formatCount === 1 ? 'set' : 'sets'}`;
+        }
+        
+        return `${matchFormat} ${formatText} - ${inMode} ${outMode}`;
+      }
+    }
+    
     const currentItem = navigationItems.find(item => item.path === location.pathname);
     return currentItem ? currentItem.text : 'DartScore';
   };

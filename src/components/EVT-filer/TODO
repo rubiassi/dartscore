@@ -1,0 +1,71 @@
+2. Statistik System Analyse
+
+Vi har gennemgået:
+
+GameStats.tsx - Viser kampstatistikker
+gameStatsReducer.ts - Gemmer rå data
+GameStatistics.ts - Beregner avancerede statistikker
+
+3. Planlagt Match Historik System
+
+Nye datastrukturer vi skal implementere:
+Apply to TODO
+Næste Skridt:
+
+Firebase Integration
+Oprette ny collection: matches/{userId}/matches/{matchId}
+Implementere MatchHistoryService
+
+Nye Komponenter
+MatchHistoryList
+MatchDetailsView
+PlayerStatsSummary
+StatisticsCharts
+FilterControls
+
+Data Flow
+Implementere gemning af kamp ved afslutning
+Opdatere all-time statistikker
+Lave statistik visning
+
+Vigtige Filer at Kende:
+src/components/game/ScoreInput.tsx
+src/components/game/GameStats.tsx
+src/reducers/gameStatsReducer.ts
+src/utils/GameStatistics.ts
+Når du er klar på den anden computer, kan vi starte med at implementere Firebase integrationen eller en af de andre opgaver du foretrækker.
+
+interface MatchHistory {
+  id: string;
+  date: Date;
+  gameType: number;          // 301, 501, etc.
+  matchFormat: {
+    sets: number;
+    legs: number;
+    legsPerSet: number;
+  };
+  players: {
+    id: string;
+    name: string;
+    type: PlayerType;
+    stats: PlayerGameData;
+    finalScore: {
+      sets: number;
+      legs: number;
+    };
+  }[];
+  winner: string;           
+  duration: number;         
+}
+
+interface UserMatches {
+  recentMatches: MatchHistory[];    
+  allTimeStats: {
+    totalMatches: number;
+    matchesWon: number;
+    averageCheckoutPercentage: number;
+    bestAverage: number;
+    highestCheckout: number;
+    oneEighties: number;
+  };
+}

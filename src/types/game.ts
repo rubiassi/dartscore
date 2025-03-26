@@ -27,6 +27,8 @@ export interface GameConfig {
   randomStart: boolean;
   showCheckout: boolean;
   useDoubles: boolean;
+  formatType: 'legs' | 'sets';
+  formatCount: number;
 }
 
 export interface PlayerGameData {

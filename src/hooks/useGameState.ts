@@ -1,23 +1,26 @@
-import { useReducer, useMemo } from 'react';
+import { useReducer, useMemo, useRef } from 'react';
 import { GameState, PlayerGameData, ThrowHistory, CheckoutGuide } from '../types/statistics';
 import { GameConfig } from '../types/game';
 
 type GameAction =
   | { type: 'ADD_THROW'; playerId: string; throwData: ThrowHistory }
-  | { type: 'ADD_LEG_WIN'; playerId: string; darts: number }
-  | { type: 'ADD_SET_WIN'; playerId: string }
+  | { type: 'ADD_LEG_WIN'; playerId: string; darts: number; callback?: (state: GameState) => void }
+  | { type: 'ADD_SET_WIN'; playerId: string; callback?: (state: GameState) => void }
   | { type: 'UPDATE_SCORE'; playerId: string; score: number }
   | { type: 'UPDATE_LAST_THROWS'; playerId: string; throws: number[] }
   | { type: 'UPDATE_LEG_DARTS'; playerId: string; darts: number }
   | { type: 'UPDATE_LEG_AVERAGE'; playerId: string; average: number }
   | { type: 'SET_CHECKOUT_GUIDE'; guide: CheckoutGuide | null }
   | { type: 'SET_CURRENT_PLAYER'; index: number }
-  | { type: 'RESET_LEG'; startingScore: number };
+  | { type: 'RESET_LEG'; startingScore: number }
+  | { type: 'NEXT_PLAYER' };
 
 const gameReducer = (state: GameState, action: GameAction): GameState => {
+  let newState: GameState;
+  
   switch (action.type) {
     case 'ADD_THROW':
-      return {
+      newState = {
         ...state,
         playerGameData: {
           ...state.playerGameData,
@@ -30,24 +33,38 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           }
         }
       };
+      return newState;
 
     case 'ADD_LEG_WIN':
-      return {
+      
+      // Hent eksisterende legs won
+      const existingLegsWon = state.playerGameData[action.playerId]?.legsWon || [];
+      
+      // Tilføj ny leg win
+      const updatedLegsWon = [...existingLegsWon, action.darts];
+      
+      // Opret nyt state med opdaterede legs
+      newState = {
         ...state,
         playerGameData: {
           ...state.playerGameData,
           [action.playerId]: {
             ...state.playerGameData[action.playerId],
-            legsWon: [
-              ...state.playerGameData[action.playerId].legsWon,
-              action.darts
-            ]
+            legsWon: updatedLegsWon
           }
         }
       };
+      
+      
+      // Kald callback hvis den findes
+      if (action.callback) {
+        action.callback(newState);
+      }
+      
+      return newState;
 
     case 'ADD_SET_WIN':
-      return {
+      newState = {
         ...state,
         playerGameData: {
           ...state.playerGameData,
@@ -57,6 +74,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           }
         }
       };
+      
+      // Kald callback hvis den findes
+      if (action.callback) {
+        action.callback(newState);
+      }
+      
+      return newState;
 
     case 'UPDATE_SCORE':
       return {
@@ -129,13 +153,25 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         checkoutGuide: null
       };
 
+    case 'NEXT_PLAYER':
+      return {
+        ...state,
+        currentPlayerIndex: (state.currentPlayerIndex + 1) % Object.keys(state.playerGameData).length
+      };
+
     default:
       return state;
   }
 };
 
 export const useGameState = (gameConfig: GameConfig) => {
+  const hasInitialized = useRef(false);
+
   const initialState: GameState = useMemo(() => {
+    if (hasInitialized.current) {
+      return {} as GameState; // Return empty state if already initialized
+    }
+
     const playerEntries = gameConfig.players
       .filter(player => player?.id)
       .map(player => [
@@ -146,6 +182,10 @@ export const useGameState = (gameConfig: GameConfig) => {
           setsWon: 0
         }
       ]);
+
+    if (!hasInitialized.current) {
+      hasInitialized.current = true;
+    }
 
     const initialScores = Object.fromEntries(
       playerEntries.map(([id]) => [id, gameConfig.startingScore])

@@ -1,12 +1,12 @@
-import React, { useEffect, useMemo } from 'react';
-import { Box, Typography, useTheme, useMediaQuery } from '@mui/material';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
+import { Box, Typography, useTheme, useMediaQuery, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
 import ScoreInput from '../components/game/ScoreInput';
 import CheckoutValidator from '../utils/CheckoutValidator';
 import { GameConfig, Player } from '../types/game';
-import { ThrowHistory } from '../types/statistics';
+import { ThrowHistory, GameState } from '../types/statistics';
 import GameStats from '../components/game/GameStats';
 import PlayerStats from '../components/game/PlayerStats';
 import { useGameState } from '../hooks/useGameState';
@@ -157,12 +157,51 @@ const NoStatsMessage = styled(Box)(({ theme }) => ({
   boxShadow: theme.shadows[2]
 }));
 
+const WinnerDialog = styled(Dialog)(({ theme }) => ({
+  '& .MuiDialog-paper': {
+    backgroundColor: theme.palette.background.paper,
+    color: theme.palette.text.primary,
+    borderRadius: theme.shape.borderRadius * 2,
+    padding: theme.spacing(3),
+    minWidth: '300px',
+    maxWidth: '90vw',
+    textAlign: 'center'
+  }
+}));
+
+const WinnerTitle = styled(Typography)(({ theme }) => ({
+  color: '#4caf50',
+  fontWeight: 700,
+  marginBottom: theme.spacing(2),
+  fontSize: '1.5rem'
+}));
+
+const WinnerContent = styled(Typography)(({ theme }) => ({
+  marginBottom: theme.spacing(3),
+  fontSize: '1.1rem'
+}));
+
 const X01Game: React.FC = () => {
   const location = useLocation();
   const gameConfig = location.state?.gameConfig as GameConfig;
   const players = gameConfig?.players?.filter(Boolean) || [];
   const { showingStats } = useGame();
   const navigate = useNavigate();
+  const [winner, setWinner] = useState<Player | null>(null);
+  const hasLogged = useRef(false);
+
+  // Sikkerhedstjek og log af kampregler
+  useEffect(() => {
+    if (!gameConfig) {
+      navigate('/local');
+      return;
+    }
+
+    // Undgå dobbelt-logging
+    if (!hasLogged.current && gameConfig) {
+      hasLogged.current = true;
+    }
+  }, [gameConfig, navigate]);
 
   const [gameState, dispatch] = useGameState(gameConfig);
   const { currentPlayerIndex, scores, lastThrows, currentLegDarts, currentLegAverage, checkoutGuide } = gameState;
@@ -192,32 +231,10 @@ const X01Game: React.FC = () => {
 
   // Hjælpefunktioner til sikker spillerhåndtering
   const getPlayerById = (id: string) => players.find(player => player?.id === id);
-  const getCurrentPlayer = () => players.find((_, index) => index === currentPlayerIndex);
-
-  // Tjek for mulige checkout kombinationer
-  useEffect(() => {
-    const currentPlayer = getCurrentPlayer();
-    if (!currentPlayer?.id) return;
-
-    const currentScore = scores[currentPlayer.id];
-    
-    if (gameConfig.useDoubles && currentScore <= 170) {
-      const checkoutInfo = CheckoutValidator.checkPossibleDoubleAttempt(currentScore, 0);
-      if (checkoutInfo.possibleDoubleAttempt && checkoutInfo.checkoutRoute) {
-        dispatch({
-          type: 'SET_CHECKOUT_GUIDE',
-          guide: {
-            score: currentScore,
-            combinations: [checkoutInfo.checkoutRoute]
-          }
-        });
-      } else {
-        dispatch({ type: 'SET_CHECKOUT_GUIDE', guide: null });
-      }
-    } else {
-      dispatch({ type: 'SET_CHECKOUT_GUIDE', guide: null });
-    }
-  }, [currentPlayerIndex, scores, gameConfig.useDoubles]);
+  const getCurrentPlayer = () => {
+    const player = players[currentPlayerIndex];
+    return player;
+  };
 
   // Opdater score når spillet starter
   useEffect(() => {
@@ -236,102 +253,143 @@ const X01Game: React.FC = () => {
         }
       });
     }
-  }, [players, scores, gameConfig.startingScore]);
+  }, [players, scores, gameConfig.startingScore, dispatch]);
 
   // Tjek om et set er vundet
   const shouldUpdateSet = () => {
+    // Hvis det ikke er sets format, skal vi ikke opdatere sets
+    if (gameConfig.formatType !== 'sets') {
+      return false;
+    }
+
     const currentPlayer = getCurrentPlayer();
     if (!currentPlayer?.id) return false;
     
     const playerData = gameState.playerGameData[currentPlayer.id];
     if (!playerData) return false;
     
+    // Ved sets spilles der altid Best of 5 legs
     const playerLegsWon = playerData.legsWon.length;
-    return playerLegsWon > 0 && playerLegsWon % gameConfig.legsPerSet === 0;
+    const legsNeededForSet = 3; // Best of 5 = først til 3
+    return playerLegsWon > 0 && playerLegsWon % legsNeededForSet === 0;
+  };
+
+  // Tjek om spillet er færdigt
+  const isGameFinished = (updatedState?: GameState) => {
+    const currentPlayer = getCurrentPlayer();
+    if (!currentPlayer?.id) {
+      return false;
+    }
+    
+    // Brug enten det opdaterede state eller det nuværende state
+    const state = updatedState || gameState;
+    const playerData = state.playerGameData[currentPlayer.id];
+    
+    if (!playerData) {
+      return false;
+    }
+
+    
+    if (gameConfig.formatType === 'legs') {
+      const playerLegsWon = playerData.legsWon.length;
+      
+      if (gameConfig.matchFormat === 'first') {
+        // First to X legs
+        return playerLegsWon >= gameConfig.formatCount;
+      } else {
+        // Best of X legs
+        const legsNeeded = Math.ceil(gameConfig.formatCount / 2);
+        return playerLegsWon >= legsNeeded;
+      }
+    } else {
+      // Sets format
+      const playerSetsWon = playerData.setsWon;
+      
+      if (gameConfig.matchFormat === 'first') {
+        // First to X sets
+        return playerSetsWon >= gameConfig.formatCount;
+      } else {
+        // Best of X sets
+        const setsNeeded = Math.ceil(gameConfig.formatCount / 2);
+        return playerSetsWon >= setsNeeded;
+      }
+    }
   };
 
   // Håndter score input
   const handleScore = (score: number, dartsUsed: number = 3, doublesAttempted: number = 0) => {
     const currentPlayer = getCurrentPlayer();
-    if (!currentPlayer) return;
+    if (!currentPlayer?.id) return;
 
     const currentScore = scores[currentPlayer.id];
     const newScore = currentScore - score;
 
-    // Valider score baseret på spilindstillinger
-    if (gameConfig.outMode === 'double' && newScore === 0 && doublesAttempted === 0) {
-      // Hvis double out er påkrævet, men der ikke blev forsøgt double
-      return;
-    }
-
-    // Opdater throw historik
-    const throwData: ThrowHistory = {
-      score,
-      dartsUsed,
-      doublesAttempted,
-      isCheckout: newScore === 0
-    };
-    dispatch({ type: 'ADD_THROW', playerId: currentPlayer.id, throwData });
-
     // Opdater score
-    dispatch({ type: 'UPDATE_SCORE', playerId: currentPlayer.id, score: newScore });
+    dispatch({ 
+      type: 'UPDATE_SCORE', 
+      playerId: currentPlayer.id, 
+      score: newScore 
+    });
 
     // Hvis det er en checkout (newScore === 0)
     if (newScore === 0) {
-      // Opdater legs won for spilleren
+      
+      // Opdater legs won for spilleren og tjek spilstatus i callback
       dispatch({ 
         type: 'ADD_LEG_WIN', 
         playerId: currentPlayer.id,
-        darts: dartsUsed
-      });
-      
-      // Tjek om sættet er vundet
-      if (shouldUpdateSet()) {
-        dispatch({ type: 'ADD_SET_WIN', playerId: currentPlayer.id });
-      }
-      
-      // Reset scores for alle spillere til ny leg
-      players.forEach(player => {
-        if (player?.id) {
-          dispatch({ 
-            type: 'UPDATE_SCORE', 
-            playerId: player.id, 
-            score: gameConfig.startingScore 
-          });
+        darts: dartsUsed,
+        callback: (updatedState) => {
+          
+          // Tjek om sættet er vundet baseret på opdateret data
+          if (shouldUpdateSet()) {
+            dispatch({ 
+              type: 'ADD_SET_WIN', 
+              playerId: currentPlayer.id,
+              callback: (finalState) => {
+                if (isGameFinished(finalState)) {
+                  setWinner(currentPlayer);
+                  return;
+                }
+                resetScoresAndNextPlayer();
+              }
+            });
+          } else {
+            if (isGameFinished(updatedState)) {
+              setWinner(currentPlayer);
+              return;
+            }
+            resetScoresAndNextPlayer();
+          }
         }
       });
-
-      // Find næste startspiller for den nye leg
-      if (!gameConfig.randomStart) {
-        const nextStarterIndex = (currentPlayerIndex + 1) % players.length;
-        dispatch({ 
-          type: 'SET_CURRENT_PLAYER',
-          index: nextStarterIndex
-        });
-      } else {
-        // Hvis random start er aktiveret, vælg en tilfældig spiller
-        const randomIndex = Math.floor(Math.random() * players.length);
-        dispatch({ 
-          type: 'SET_CURRENT_PLAYER',
-          index: randomIndex
-        });
-      }
     } else {
-      // Skift spiller hvis ikke checkout
-      dispatch({ 
-        type: 'SET_CURRENT_PLAYER',
-        index: currentPlayerIndex === players.length - 1 ? 0 : currentPlayerIndex + 1
-      });
+      // Hvis det ikke er en checkout, gå til næste spiller
+      dispatch({ type: 'NEXT_PLAYER' });
     }
   };
 
-  // Sikkerhedstjek for gameConfig
-  useEffect(() => {
-    if (!gameConfig) {
-      navigate('/local');
-      return;
-    }
-  }, [gameConfig]);
+  // Hjælpefunktion til at resette scores og gå til næste spiller
+  const resetScoresAndNextPlayer = () => {
+    // Reset scores for alle spillere til ny leg
+    players.forEach(player => {
+      if (player?.id) {
+        dispatch({ 
+          type: 'UPDATE_SCORE', 
+          playerId: player.id, 
+          score: gameConfig.startingScore 
+        });
+      }
+    });
+    
+    // Gå til næste spiller
+    dispatch({ type: 'NEXT_PLAYER' });
+  };
+
+  const handleCloseWinnerDialog = () => {
+    setWinner(null);
+    navigate('/local');
+  };
 
   // Render game content
   const renderGameContent = () => {
@@ -431,6 +489,44 @@ const X01Game: React.FC = () => {
   return (
     <GameContainer>
       {renderGameContent()}
+      
+      <WinnerDialog
+        open={!!winner}
+        onClose={handleCloseWinnerDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <WinnerTitle>
+            🎉 Tillykke! 🎉
+          </WinnerTitle>
+        </DialogTitle>
+        <DialogContent>
+          <WinnerContent>
+            {winner?.name} har vundet spillet!
+          </WinnerContent>
+          <Typography variant="body1" color="text.secondary">
+            {gameConfig.matchFormat === 'first' 
+              ? `Vandt ${gameConfig.legs} leg`
+              : `Vandt ${Math.ceil((gameConfig.legs * gameConfig.sets) / 2)} ud af ${gameConfig.legs * gameConfig.sets} legs`
+            }
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ justifyContent: 'center', pb: 3 }}>
+          <Button 
+            variant="contained" 
+            onClick={handleCloseWinnerDialog}
+            sx={{
+              bgcolor: '#4caf50',
+              '&:hover': {
+                bgcolor: '#388e3c'
+              }
+            }}
+          >
+            Afslut spil
+          </Button>
+        </DialogActions>
+      </WinnerDialog>
     </GameContainer>
   );
 };

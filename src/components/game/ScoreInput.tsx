@@ -152,40 +152,6 @@ const StyledActionButton = styled(Button, {
   }
 }));
 
-const StyledDialog = styled(Dialog)(({ theme }) => ({
-  '& .MuiDialog-paper': {
-    backgroundColor: theme.palette.background.paper,
-    color: theme.palette.text.primary,
-    borderRadius: theme.shape.borderRadius * 2,
-    padding: theme.spacing(2),
-    [theme.breakpoints.up('sm')]: {
-      padding: theme.spacing(3)
-    }
-  }
-}));
-
-const StyledDialogTitle = styled(DialogTitle)(({ theme }) => ({
-  fontSize: '1.25rem',
-  fontWeight: 600,
-  textAlign: 'center',
-  padding: theme.spacing(2, 3),
-  [theme.breakpoints.up('sm')]: {
-    fontSize: '1.5rem'
-  }
-}));
-
-const StyledDialogContent = styled(DialogContent)(({ theme }) => ({
-  padding: theme.spacing(2, 3),
-  '& .MuiTypography-root': {
-    marginBottom: theme.spacing(2)
-  }
-}));
-
-const StyledDialogActions = styled(DialogActions)(({ theme }) => ({
-  padding: theme.spacing(2, 3),
-  gap: theme.spacing(2)
-}));
-
 const StyledScoreDisplay = styled(Typography)(({ theme }) => ({
   fontSize: '2rem',
   fontWeight: 700,
@@ -298,14 +264,12 @@ const ScoreInput: React.FC<ScoreInputProps> = ({
     setCheckLukningResult(null);
   };
 
-  const handleSelectDoubleAttempt = (attempts: number) => {
-    setIsDoubleAttemptModalOpen(false);
-    onScore(tempScore, 3, attempts);
+  const handleBust = useCallback(() => {
+    onScore(0, 3, 0);
     setInputScore('');
-    setCheckDartsOptions([]);
-  };
+  }, [onScore]);
 
-  const handleScoreInput = (score: number) => {
+  const handleScoreInput = useCallback((score: number) => {
     const newScore = currentScore - score;
 
     // Tjek for ugyldige scores
@@ -349,12 +313,27 @@ const ScoreInput: React.FC<ScoreInputProps> = ({
 
     onScore(score, 3, 0);
     setInputScore('');
-  };
+  }, [
+    currentScore,
+    fixedScores,
+    gameConfig.showCheckout,
+    onScore,
+    setInputScore,
+    setTempScore,
+    setCheckDartsOptions,
+    setIsDoubleAttemptModalOpen,
+    findCheckDartsOptions,
+    findClosingOptions,
+    handleOpenDartModal,
+    handleBust
+  ]);
 
-  const handleBust = useCallback(() => {
-    onScore(0, 3, 0);
+  const handleSelectDoubleAttempt = (attempts: number) => {
+    setIsDoubleAttemptModalOpen(false);
+    onScore(tempScore, 3, attempts);
     setInputScore('');
-  }, [onScore]);
+    setCheckDartsOptions([]);
+  };
 
   const handleUndo = useCallback(() => {
     if (inputScore.length > 0) {
@@ -381,7 +360,7 @@ const ScoreInput: React.FC<ScoreInputProps> = ({
         }
       }
     }
-  }, [inputScore, fixedScores]);
+  }, [inputScore, fixedScores, handleScoreInput]);
 
   // Memoize score validering
   const isValidScore = useMemo(() => {

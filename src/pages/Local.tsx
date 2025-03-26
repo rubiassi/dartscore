@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
 import SportsScoreIcon from '@mui/icons-material/SportsScore';
 import FitnessCenterIcon from '@mui/icons-material/FitnessCenter';
+import NavigationLayout from '../components/layout/NavigationLayout';
 
 // Styled components
 const StyledPaper = styled(Paper)(({ theme }) => ({
@@ -86,103 +87,105 @@ const Local = () => {
   ];
 
   return (
-    <Box sx={{ 
-      bgcolor: theme => theme.palette.background.default,
-      minHeight: '100vh',
-      py: 4
-    }}>
-      <Container maxWidth="lg">
-        {/* Main Games Section */}
-        <StyledPaper>
-          <Box sx={{ mb: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <SportsScoreIcon sx={{ color: 'primary.main' }} />
+    <NavigationLayout>
+      <Box sx={{ 
+        bgcolor: theme => theme.palette.background.default,
+        minHeight: '100vh',
+        py: 4
+      }}>
+        <Container maxWidth="lg">
+          {/* Main Games Section */}
+          <StyledPaper>
+            <Box sx={{ mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <SportsScoreIcon sx={{ color: 'primary.main' }} />
+                <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                  Game Modes
+                </Typography>
+              </Box>
+              <Grid container spacing={2}>
+                {mainGames.map((game) => (
+                  <Grid item xs={12} md={6} key={game.title}>
+                    <StyledGameButton
+                      fullWidth
+                      onClick={() => navigate(game.path)}
+                      disabled={game.disabled}
+                    >
+                      <Box sx={{ 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 1
+                      }}>
+                        {game.icon}
+                        <Typography variant="h5" sx={{ fontWeight: 500 }}>
+                          {game.title}
+                        </Typography>
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            color: 'text.secondary',
+                            opacity: game.disabled ? 0.5 : 1
+                          }}
+                        >
+                          {game.description}
+                        </Typography>
+                      </Box>
+                    </StyledGameButton>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          </StyledPaper>
+
+          {/* Training Games Section */}
+          <StyledPaper>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+              <FitnessCenterIcon sx={{ color: 'primary.main' }} />
               <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                Game Modes
+                Training Games
               </Typography>
             </Box>
-            <Grid container spacing={2}>
-              {mainGames.map((game) => (
-                <Grid item xs={12} md={6} key={game.title}>
-                  <StyledGameButton
-                    fullWidth
-                    onClick={() => navigate(game.path)}
-                    disabled={game.disabled}
-                  >
-                    <Box sx={{ 
-                      display: 'flex', 
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: 1
-                    }}>
-                      {game.icon}
-                      <Typography variant="h5" sx={{ fontWeight: 500 }}>
-                        {game.title}
-                      </Typography>
-                      <Typography 
-                        variant="body2" 
-                        sx={{ 
-                          color: 'text.secondary',
-                          opacity: game.disabled ? 0.5 : 1
-                        }}
+
+            <Grid container spacing={3}>
+              {/* Left Column */}
+              <Grid item xs={12} md={6}>
+                <Grid container spacing={2}>
+                  {trainingGames[0].map((game) => (
+                    <Grid item xs={12} key={game.title}>
+                      <StyledTrainingButton
+                        fullWidth
+                        onClick={() => navigate(game.path)}
+                        disabled={game.disabled}
                       >
-                        {game.description}
-                      </Typography>
-                    </Box>
-                  </StyledGameButton>
+                        {game.title}
+                      </StyledTrainingButton>
+                    </Grid>
+                  ))}
                 </Grid>
-              ))}
-            </Grid>
-          </Box>
-        </StyledPaper>
+              </Grid>
 
-        {/* Training Games Section */}
-        <StyledPaper>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
-            <FitnessCenterIcon sx={{ color: 'primary.main' }} />
-            <Typography variant="h6" sx={{ fontWeight: 500 }}>
-              Training Games
-            </Typography>
-          </Box>
-
-          <Grid container spacing={3}>
-            {/* Left Column */}
-            <Grid item xs={12} md={6}>
-              <Grid container spacing={2}>
-                {trainingGames[0].map((game) => (
-                  <Grid item xs={12} key={game.title}>
-                    <StyledTrainingButton
-                      fullWidth
-                      onClick={() => navigate(game.path)}
-                      disabled={game.disabled}
-                    >
-                      {game.title}
-                    </StyledTrainingButton>
-                  </Grid>
-                ))}
+              {/* Right Column */}
+              <Grid item xs={12} md={6}>
+                <Grid container spacing={2}>
+                  {trainingGames[1].map((game) => (
+                    <Grid item xs={12} key={game.title}>
+                      <StyledTrainingButton
+                        fullWidth
+                        onClick={() => navigate(game.path)}
+                        disabled={game.disabled}
+                      >
+                        {game.title}
+                      </StyledTrainingButton>
+                    </Grid>
+                  ))}
+                </Grid>
               </Grid>
             </Grid>
-
-            {/* Right Column */}
-            <Grid item xs={12} md={6}>
-              <Grid container spacing={2}>
-                {trainingGames[1].map((game) => (
-                  <Grid item xs={12} key={game.title}>
-                    <StyledTrainingButton
-                      fullWidth
-                      onClick={() => navigate(game.path)}
-                      disabled={game.disabled}
-                    >
-                      {game.title}
-                    </StyledTrainingButton>
-                  </Grid>
-                ))}
-              </Grid>
-            </Grid>
-          </Grid>
-        </StyledPaper>
-      </Container>
-    </Box>
+          </StyledPaper>
+        </Container>
+      </Box>
+    </NavigationLayout>
   );
 };
 

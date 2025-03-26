@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { User } from 'firebase/auth';
@@ -33,7 +33,6 @@ import {
   useTheme
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import AddIcon from '@mui/icons-material/Add';
 import PersonIcon from '@mui/icons-material/Person';
 import GroupsIcon from '@mui/icons-material/Groups';
 import EditIcon from '@mui/icons-material/Edit';
@@ -42,19 +41,17 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import SportsKabaddiIcon from '@mui/icons-material/SportsKabaddi';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import SettingsIcon from '@mui/icons-material/Settings';
 import LoginDialog from '../components/dialogs/LoginDialog';
 import GuestDialog from '../components/dialogs/GuestDialog';
 import BotDialog from '../components/dialogs/BotDialog';
 import FriendDialog from '../components/dialogs/FriendDialog';
 import { GameConfig, Player, PlayerType } from '../types/game';
-import SettingsIcon from '@mui/icons-material/Settings';
 import NavigationLayout from '../components/layout/NavigationLayout';
+import AddIcon from '@mui/icons-material/Add';
 
 // Interfaces og typer
 type MatchFormat = 'first' | 'best';
-type Position = 0 | 1 | 2 | 3;
-type SwapDirection = 'next' | 'previous' | 'across';
 
 interface GameSettings {
   gameType: number;
@@ -98,11 +95,6 @@ interface LoginDialogProps {
 }
 
 const isBot = (type: PlayerType): type is 'bot' => type === 'bot';
-
-// Tilføj ItemTypes konstant
-const ItemTypes = {
-  PLAYER_CARD: 'playerCard'
-};
 
 const PlayerCard: React.FC<PlayerCardProps> = ({ 
   player, 
@@ -179,15 +171,6 @@ const StyledButton = styled(Button)(({ theme }) => ({
   gap: theme.spacing(1),
 }));
 
-const StyledSwitch = styled(Switch)(({ theme }) => ({
-  '& .MuiSwitch-switchBase.Mui-checked': {
-    color: theme.palette.primary.main,
-  },
-  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-    backgroundColor: theme.palette.primary.main,
-  },
-}));
-
 const StyledTextField = styled(TextField)(({ theme }) => ({
   '& .MuiOutlinedInput-root': {
     color: theme.palette.text.primary,
@@ -200,27 +183,6 @@ const StyledTextField = styled(TextField)(({ theme }) => ({
   },
   '& .MuiInputLabel-root': {
     color: theme.palette.text.secondary,
-  },
-}));
-
-const StyledToggleButtonGroup = styled(ToggleButtonGroup)(({ theme }) => ({
-  display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
-  gap: theme.spacing(1),
-  width: '100%',
-  '& .MuiToggleButton-root': {
-    color: theme.palette.text.primary,
-    borderColor: theme.palette.divider,
-    '&.Mui-selected': {
-      backgroundColor: theme.palette.primary.dark,
-      color: theme.palette.primary.contrastText,
-      '&:hover': {
-        backgroundColor: theme.palette.primary.main,
-      },
-    },
-    '&:hover': {
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    },
   },
 }));
 
@@ -268,7 +230,7 @@ const X01Setup = () => {
     formatCount: 5,
     inMode: 'straight',
     outMode: 'double',
-    checkoutRate: false
+    checkoutRate: true
   });
 
   // Game settings
@@ -278,17 +240,13 @@ const X01Setup = () => {
   const [setsDialogOpen, setSetsDialogOpen] = useState(false);
   const [legsDialogOpen, setLegsDialogOpen] = useState(false);
   const [startingInDialogOpen, setStartingInDialogOpen] = useState(false);
-  const [doubleOut, setDoubleOut] = useState<boolean>(true);
-  const [startingIn, setStartingIn] = useState('straight');
   
   // Game options
   const [isTraining, setIsTraining] = useState(false);
   const [scoreAnnouncer, setScoreAnnouncer] = useState(false);
-  const [randomStart, setRandomStart] = useState(false);
   
   // Checkout options
   const [showCheckout, setShowCheckout] = useState(true);
-  const [useDoubles, setUseDoubles] = useState(true);
 
   // Dialog states
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
@@ -299,6 +257,9 @@ const X01Setup = () => {
 
   // Out rules
   const [outRulesDialogOpen, setOutRulesDialogOpen] = useState(false);
+
+  // Tilføj state for aktiv spiltype
+  const [gameType, setGameType] = useState<'singles' | 'teams'>('singles');
 
   const startingScoreOptions = [
     { value: 101, label: '101' },
@@ -354,15 +315,18 @@ const X01Setup = () => {
 
       setPlayers(currentPlayers => {
         const newPlayers = [...currentPlayers];
+        // Hvis der kun er én spiller, tilføj den nye spiller som nummer 2
         if (currentPlayers.length === 1) {
-          newPlayers[2] = newPlayer;
+          newPlayers.push(newPlayer);
         } else {
+          // Ellers erstat den valgte position med den nye spiller
           newPlayers[selectedPlayer] = newPlayer;
         }
         return newPlayers;
       });
     }
     setGuestDialogOpen(false);
+    setSelectedPlayer(null);
   };
 
   const handleLoginSuccess = (user: User) => {
@@ -442,29 +406,42 @@ const X01Setup = () => {
   };
 
   const handleStartGame = () => {
-    if (players.every(player => player.name.trim())) {
       const gameConfig: GameConfig = {
-        players: players.map(player => ({
-          ...player,
-          score: startingScore // Brug startingScore i stedet for gameType
-        })),
-        gameType: startingScore, // Brug startingScore her også
-        startingScore: startingScore,
+        players,
+        gameType: gameSettings.gameType,
+        startingScore: gameSettings.gameType,
         matchFormat: gameSettings.matchFormat,
-        sets: gameSettings.sets,
-        legs: gameSettings.legs,
-        legsPerSet: gameSettings.legs,
+        sets: gameSettings.formatType === 'sets' ? gameSettings.formatCount : 1,
+        legs: gameSettings.formatType === 'sets' ? 5 : gameSettings.formatCount,
+        legsPerSet: gameSettings.formatType === 'sets' ? 5 : 1,
         inMode: gameSettings.inMode,
         outMode: gameSettings.outMode,
         isTraining,
         scoreAnnouncer,
-        randomStart,
-        showCheckout,
-        useDoubles
+        randomStart: false,
+        showCheckout: gameSettings.checkoutRate,
+        useDoubles: gameSettings.outMode === 'double',
+        formatType: gameSettings.formatType,
+        formatCount: gameSettings.formatCount
       };
       
+      // Log kampregler
+      console.log('Kampregler der sendes med:');
+      console.log('Match Format:', gameConfig.matchFormat);
+      console.log('Format Type:', gameConfig.formatType);
+      console.log('Format Count:', gameConfig.formatCount);
+      console.log('Antal Sets:', gameConfig.sets);
+      console.log('Antal Legs:', gameConfig.legs);
+      console.log('Legs per Set:', gameConfig.legsPerSet);
+      console.log('In Mode:', gameConfig.inMode);
+      console.log('Out Mode:', gameConfig.outMode);
+      console.log('Starting Score:', gameConfig.startingScore);
+      console.log('Use Doubles:', gameConfig.useDoubles);
+      console.log('Show Checkout:', gameConfig.showCheckout);
+      console.log('Training Mode:', gameConfig.isTraining);
+      console.log('Score Announcer:', gameConfig.scoreAnnouncer);
+      
       navigate('/x01game', { state: { gameConfig } });
-    }
   };
 
   const handleMoveUp = (index: number) => {
@@ -509,16 +486,6 @@ const X01Setup = () => {
     matchFormat: 'first' as MatchFormat 
   });
 
-  const handleSetsChange = (prev: GameSettings, value: number): GameSettings => ({ 
-    ...prev, 
-    sets: value 
-  });
-
-  const handleLegsChange = (prev: GameSettings, value: number): GameSettings => ({ 
-    ...prev, 
-    legs: value 
-  });
-
   const handleInModeChange = (prev: GameSettings): GameSettings => ({ 
     ...prev, 
     inMode: 'straight' as 'straight' | 'double' | 'triple'
@@ -529,61 +496,490 @@ const X01Setup = () => {
     outMode: 'double' as 'double' | 'master' | 'straight'
   });
 
+  // New state for format count dialog
+  const [formatCountDialogOpen, setFormatCountDialogOpen] = useState(false);
+
   return (
+    <NavigationLayout>
     <Box sx={{ 
       bgcolor: theme.palette.background.default,
-      minHeight: '100vh',
-      p: 2,
-      color: theme.palette.text.primary
+      minHeight: '100%',
+      height: '100%',
+      p: { xs: 1, sm: 2 },
+      color: theme.palette.text.primary,
+      overflow: 'auto'
     }}>
-      <Container maxWidth="sm">
-        <StyledPaper>
+      <Container maxWidth="sm" sx={{ px: { xs: 1, sm: 2 }, height: '100%' }}>
+        <StyledPaper sx={{ mb: { xs: 1, sm: 2 } }}>
           {/* Header sektion */}
           <Box sx={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
             alignItems: 'center',
-            mb: 2
+              mb: 2,
+              mx: -3,
+              mt: -3,
+              px: 3,
+              py: 2,
+              borderTopLeftRadius: theme => theme.shape.borderRadius * 2,
+              borderTopRightRadius: theme => theme.shape.borderRadius * 2,
+              backgroundColor: 'rgba(0, 0, 0, 0.2)',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              position: 'relative',
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '1px',
+                background: 'linear-gradient(to right, transparent, rgba(255, 255, 255, 0.1), transparent)'
+              }
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <SettingsIcon sx={{ color: theme.palette.primary.main }} />
-              <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                <GroupsIcon sx={{ 
+                  color: 'white',
+                  filter: 'drop-shadow(0 2px 2px rgba(0, 0, 0, 0.2))',
+                  fontSize: '1.5rem'
+                }} />
+                <Typography variant="h6" sx={{ 
+                  fontWeight: 500,
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                  fontSize: '1.1rem'
+                }}>
                 Spilleropsætning
               </Typography>
             </Box>
             
-            {players.length < 4 && (
-              <Tooltip title="Tilføj spiller" arrow>
-                <StyledButton
-                  onClick={handleAddPlayer}
-                  startIcon={<PersonAddIcon />}
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setGameType('singles')}
+                  sx={{
+                    color: 'white',
+                    borderColor: gameType === 'singles' ? 'white' : 'rgba(255, 255, 255, 0.3)',
+                    backgroundColor: gameType === 'singles' ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                    '&:hover': {
+                      borderColor: 'rgba(255, 255, 255, 0.5)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    },
+                    backdropFilter: 'blur(4px)',
+                    py: 0.5,
+                    px: 1,
+                    fontSize: '0.75rem',
+                    minWidth: 'auto',
+                    lineHeight: 1
+                  }}
+                  startIcon={<PersonIcon sx={{ fontSize: '1rem', mr: 0.5 }} />}
                 >
-                  Tilføj spiller
-                </StyledButton>
-              </Tooltip>
-            )}
+                  Single Players
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setGameType('teams')}
+                  sx={{
+                    color: 'white',
+                    borderColor: gameType === 'teams' ? 'white' : 'rgba(255, 255, 255, 0.3)',
+                    backgroundColor: gameType === 'teams' ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                    '&:hover': {
+                      borderColor: 'rgba(255, 255, 255, 0.5)',
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    },
+                    backdropFilter: 'blur(4px)',
+                    py: 0.5,
+                    px: 1,
+                    fontSize: '0.75rem',
+                    minWidth: 'auto',
+                    lineHeight: 1
+                  }}
+                  startIcon={<GroupsIcon sx={{ fontSize: '1rem', mr: 0.5 }} />}
+                >
+                  Teams
+                </Button>
+              </Box>
           </Box>
 
-          <Box sx={{ mt: 2 }}>
-            {players.map((player, index) => (
-              <PlayerCard
-                key={player.id}
-                player={player}
-                index={index}
-                onMoveUp={handleMoveUp}
-                onMoveDown={handleMoveDown}
-                onEdit={handleEditPlayer}
-                onRemove={handleRemovePlayer}
-                isHome={index < Math.ceil(players.length / 2)}
-                totalPlayers={players.length}
-                onPlayerTypeChange={handlePlayerTypeChange}
-              />
-            ))}
+            {/* Player Grid */}
+            <Grid container spacing={2} sx={{ mt: 2 }}>
+              {gameType === 'singles' ? (
+                // Singles Layout
+                <>
+                  {/* Player 1 Section */}
+                  <Grid item xs={12} md={5.4}>
+                    <Card sx={{ 
+                      bgcolor: 'rgba(255, 255, 255, 0.05)',
+                      backdropFilter: 'blur(10px)',
+                      height: '100%'
+                    }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Avatar src={players[0]?.avatar}>
+                            {players[0]?.name?.[0] || 'G'}
+                          </Avatar>
+                          <Typography variant="h6">
+                            {players[0]?.name || 'Guest'}
+                          </Typography>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+
+                  {/* VS Section */}
+                  <Grid item xs={12} md={1.2} sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center'
+                  }}>
+                    <Box sx={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(4px)',
+                      color: theme.palette.primary.main,
+                      fontWeight: 900,
+                      fontSize: '1rem',
+                      fontFamily: 'arial',
+                      position: 'relative',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                    }}>
+                      VS
+                    </Box>
+                  </Grid>
+
+                  {/* Player 2 Section */}
+                  <Grid item xs={12} md={5.4}>
+                    {players[1] ? (
+                      <Card sx={{ 
+                        bgcolor: 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(10px)',
+                        height: '100%',
+                        position: 'relative'
+                      }}>
+                        <IconButton
+                          onClick={() => handleRemovePlayer(1)}
+                          sx={{
+                            position: 'absolute',
+                            top: 4,
+                            right: 4,
+                            color: 'rgba(255, 255, 255, 0.5)',
+                            '&:hover': {
+                              color: 'white',
+                              bgcolor: 'rgba(255, 255, 255, 0.1)'
+                            }
+                          }}
+                        >
+                          <CloseIcon fontSize="small" />
+                        </IconButton>
+                        <CardContent>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Avatar src={players[1]?.avatar}>
+                              {players[1]?.name?.[0] || 'G'}
+                            </Avatar>
+                            <Typography variant="h6">
+                              {players[1]?.name || 'Guest'}
+                            </Typography>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <Card sx={{ 
+                        bgcolor: 'rgba(255, 255, 255, 0.05)',
+                        backdropFilter: 'blur(10px)',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.1)'
+                        }
+                      }}
+                      onClick={() => {
+                        setSelectedPlayer(1);
+                        setPlayerTypeDialogOpen(true);
+                      }}
+                      >
+                        <CardContent sx={{ 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          alignItems: 'center',
+                          gap: 1
+                        }}>
+                          <AddIcon sx={{ fontSize: '2rem' }} />
+                          <Typography>
+                            Tilføj Modstander
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </Grid>
+                </>
+              ) : (
+                // Teams Layout
+                <>
+                  {/* Team 1 Section */}
+                  <Grid item xs={12} md={5.4}>
+                    <Grid container spacing={2}>
+                      {/* Team 1 Player 1 */}
+                      <Grid item xs={12}>
+                        <Card sx={{ 
+                          bgcolor: 'rgba(255, 255, 255, 0.05)',
+                          backdropFilter: 'blur(10px)',
+                          height: '100%'
+                        }}>
+                          <CardContent>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                              <Avatar src={players[0]?.avatar}>
+                                {players[0]?.name?.[0] || 'G'}
+                              </Avatar>
+                              <Typography variant="h6">
+                                {players[0]?.name || 'Guest'}
+                              </Typography>
           </Box>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      {/* Team 1 Player 2 */}
+                      <Grid item xs={12}>
+                        {players[1] ? (
+                          <Card sx={{ 
+                            bgcolor: 'rgba(255, 255, 255, 0.05)',
+                            backdropFilter: 'blur(10px)',
+                            height: '100%'
+                          }}>
+                            <CardContent>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <Avatar src={players[1]?.avatar}>
+                                  {players[1]?.name?.[0] || 'G'}
+                                </Avatar>
+                                <Typography variant="h6">
+                                  {players[1]?.name || 'Guest'}
+                                </Typography>
+                              </Box>
+                            </CardContent>
+                          </Card>
+                        ) : (
+                          <Card sx={{ 
+                            bgcolor: 'rgba(255, 255, 255, 0.05)',
+                            backdropFilter: 'blur(10px)',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            '&:hover': {
+                              bgcolor: 'rgba(255, 255, 255, 0.1)'
+                            }
+                          }}
+                          onClick={() => {
+                            setSelectedPlayer(1);
+                            setPlayerTypeDialogOpen(true);
+                          }}
+                          >
+                            <CardContent sx={{ 
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              alignItems: 'center',
+                              gap: 1
+                            }}>
+                              <AddIcon sx={{ fontSize: '2rem' }} />
+                              <Typography>
+                                Tilføj Medspiller
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </Grid>
+                    </Grid>
+                  </Grid>
+
+                  {/* VS Section */}
+                  <Grid item xs={12} md={1.2} sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center'
+                  }}>
+                    <Box sx={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      backdropFilter: 'blur(4px)',
+                      color: theme.palette.primary.main,
+                      fontWeight: 900,
+                      fontSize: '1rem',
+                      fontFamily: 'arial',
+                      position: 'relative',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                    }}>
+                      VS
+          </Box>
+                  </Grid>
+
+                  {/* Team 2 Section */}
+                  <Grid item xs={12} md={5.4}>
+                    <Grid container spacing={2}>
+                      {/* Team 2 Player 1 */}
+                      <Grid item xs={12}>
+                        {players[2] ? (
+                          <Card sx={{ 
+                            bgcolor: 'rgba(255, 255, 255, 0.05)',
+                            backdropFilter: 'blur(10px)',
+                            height: '100%'
+                          }}>
+                            <CardContent>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <Avatar src={players[2]?.avatar}>
+                                  {players[2]?.name?.[0] || 'G'}
+                                </Avatar>
+                                <Typography variant="h6">
+                                  {players[2]?.name || 'Guest'}
+                                </Typography>
+                              </Box>
+                            </CardContent>
+                          </Card>
+                        ) : (
+                          <Card sx={{ 
+                            bgcolor: 'rgba(255, 255, 255, 0.05)',
+                            backdropFilter: 'blur(10px)',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            '&:hover': {
+                              bgcolor: 'rgba(255, 255, 255, 0.1)'
+                            }
+                          }}
+                          onClick={() => {
+                            setSelectedPlayer(2);
+                            setPlayerTypeDialogOpen(true);
+                          }}
+                          >
+                            <CardContent sx={{ 
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              alignItems: 'center',
+                              gap: 1
+                            }}>
+                              <AddIcon sx={{ fontSize: '2rem' }} />
+                              <Typography>
+                                Tilføj Medspiller
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </Grid>
+                      {/* Team 2 Player 2 */}
+                      <Grid item xs={12}>
+                        {players[3] ? (
+                          <Card sx={{ 
+                            bgcolor: 'rgba(255, 255, 255, 0.05)',
+                            backdropFilter: 'blur(10px)',
+                            height: '100%'
+                          }}>
+                            <CardContent>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <Avatar src={players[3]?.avatar}>
+                                  {players[3]?.name?.[0] || 'G'}
+                                </Avatar>
+                                <Typography variant="h6">
+                                  {players[3]?.name || 'Guest'}
+                                </Typography>
+                              </Box>
+                            </CardContent>
+                          </Card>
+                        ) : (
+                          <Card sx={{ 
+                            bgcolor: 'rgba(255, 255, 255, 0.05)',
+                            backdropFilter: 'blur(10px)',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            '&:hover': {
+                              bgcolor: 'rgba(255, 255, 255, 0.1)'
+                            }
+                          }}
+                          onClick={() => {
+                            setSelectedPlayer(3);
+                            setPlayerTypeDialogOpen(true);
+                          }}
+                          >
+                            <CardContent sx={{ 
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              alignItems: 'center',
+                              gap: 1
+                            }}>
+                              <AddIcon sx={{ fontSize: '2rem' }} />
+                              <Typography>
+                                Tilføj Medspiller
+                              </Typography>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </Grid>
+                    </Grid>
+                  </Grid>
+                </>
+              )}
+            </Grid>
         </StyledPaper>
 
         {/* Game Settings */}
-        <StyledPaper>
+        <StyledPaper sx={{ mb: { xs: 1, sm: 2 } }}>
+            {/* Header sektion */}
+            <Box sx={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              mb: 2,
+              mx: -3,
+              mt: -3,
+              px: 3,
+              py: 2,
+              borderTopLeftRadius: theme => theme.shape.borderRadius * 2,
+              borderTopRightRadius: theme => theme.shape.borderRadius * 2,
+              backgroundColor: 'rgba(0, 0, 0, 0.2)',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+              position: 'relative',
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '1px',
+                background: 'linear-gradient(to right, transparent, rgba(255, 255, 255, 0.1), transparent)'
+              }
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <SettingsIcon sx={{ 
+                  color: 'white',
+                  filter: 'drop-shadow(0 2px 2px rgba(0, 0, 0, 0.2))',
+                  fontSize: '1.5rem'
+                }} />
+                <Typography variant="h6" sx={{ 
+                  fontWeight: 500,
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                  fontSize: '1.1rem'
+                }}>
+                  Spilopsætning
+                </Typography>
+              </Box>
+            </Box>
+
           <Box sx={{ 
             display: 'flex', 
             alignItems: 'center', 
@@ -597,6 +993,8 @@ const X01Setup = () => {
                 onClick={() => setStartingScoreDialogOpen(true)}
                 fullWidth
                 sx={{
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  backdropFilter: 'blur(4px)',
                   color: 'white',
                   borderColor: 'rgba(255, 255, 255, 0.2)',
                   justifyContent: 'space-between',
@@ -605,7 +1003,9 @@ const X01Setup = () => {
                     bgcolor: 'rgba(255, 255, 255, 0.1)',
                   },
                   textTransform: 'none',
-                  py: 1
+                  py: 1,
+                  height: 40,
+                  fontSize: '0.875rem'
                 }}
               >
                 {startingScore}
@@ -619,25 +1019,63 @@ const X01Setup = () => {
             mb: 2,
             gap: 2 
           }}>
-            <Typography sx={{ flex: 1 }}>First to / Best of</Typography>
-            <Box sx={{ flex: 1 }}>
+            <Typography sx={{ flex: 1 }}>Match format</Typography>
+            <Box sx={{ 
+              flex: 1,
+              display: 'flex',
+              gap: 1
+            }}>
               <Button
                 variant="outlined"
-                onClick={() => setMatchFormatDialogOpen(true)}
-                fullWidth
+                onClick={() => {
+                  setGameSettings(prev => ({ ...prev, matchFormat: 'first' }));
+                }}
                 sx={{
+                  flex: 1,
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  backdropFilter: 'blur(4px)',
                   color: 'white',
-                  borderColor: 'rgba(255, 255, 255, 0.2)',
-                  justifyContent: 'space-between',
+                  borderColor: gameSettings.matchFormat === 'first' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                  borderWidth: gameSettings.matchFormat === 'first' ? 2 : 1,
                   '&:hover': {
                     borderColor: 'rgba(255, 255, 255, 0.3)',
                     bgcolor: 'rgba(255, 255, 255, 0.1)',
                   },
+                  ...(gameSettings.matchFormat === 'first' && {
+                    bgcolor: 'rgba(255, 255, 255, 0.15)',
+                  }),
                   textTransform: 'none',
-                  py: 1
+                  height: 40,
+                  fontSize: '0.875rem'
                 }}
               >
-                {gameSettings.matchFormat === 'first' ? 'First to' : 'Best of'}
+                First to
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setGameSettings(prev => ({ ...prev, matchFormat: 'best' }));
+                }}
+                sx={{
+                  flex: 1,
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  backdropFilter: 'blur(4px)',
+                  color: 'white',
+                  borderColor: gameSettings.matchFormat === 'best' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                  borderWidth: gameSettings.matchFormat === 'best' ? 2 : 1,
+                  '&:hover': {
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                  },
+                  ...(gameSettings.matchFormat === 'best' && {
+                    bgcolor: 'rgba(255, 255, 255, 0.15)',
+                  }),
+                  textTransform: 'none',
+                  height: 40,
+                  fontSize: '0.875rem'
+                }}
+              >
+                Best of
               </Button>
             </Box>
           </Box>
@@ -656,39 +1094,203 @@ const X01Setup = () => {
             }}>
               <Button
                 variant="outlined"
-                onClick={() => setSetsDialogOpen(true)}
+                onClick={() => setGameSettings(prev => ({ ...prev, formatType: 'sets' }))}
                 sx={{
-                  flex: 1,
+                  width: 100,
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  backdropFilter: 'blur(4px)',
                   color: 'white',
-                  borderColor: 'rgba(255, 255, 255, 0.2)',
-                  justifyContent: 'space-between',
+                  borderColor: gameSettings.formatType === 'sets' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                  borderWidth: gameSettings.formatType === 'sets' ? 2 : 1,
                   '&:hover': {
                     borderColor: 'rgba(255, 255, 255, 0.3)',
                     bgcolor: 'rgba(255, 255, 255, 0.1)',
                   },
+                  ...(gameSettings.formatType === 'sets' && {
+                    bgcolor: 'rgba(255, 255, 255, 0.15)',
+                  }),
                   textTransform: 'none',
-                  py: 1
+                  height: 40,
+                  fontSize: '0.875rem'
                 }}
               >
-                {`${gameSettings.sets} set${gameSettings.sets > 1 ? 's' : ''}`}
+                Sets
               </Button>
               <Button
                 variant="outlined"
-                onClick={() => setLegsDialogOpen(true)}
+                onClick={() => setFormatCountDialogOpen(true)}
                 sx={{
-                  flex: 1,
+                  width: 60,
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  backdropFilter: 'blur(4px)',
                   color: 'white',
                   borderColor: 'rgba(255, 255, 255, 0.2)',
-                  justifyContent: 'space-between',
                   '&:hover': {
                     borderColor: 'rgba(255, 255, 255, 0.3)',
                     bgcolor: 'rgba(255, 255, 255, 0.1)',
                   },
                   textTransform: 'none',
-                  py: 1
+                  height: 40,
+                  fontSize: '0.875rem'
                 }}
               >
-                {`${gameSettings.legs} leg${gameSettings.legs > 1 ? 's' : ''}`}
+                {gameSettings.formatCount}
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => setGameSettings(prev => ({ ...prev, formatType: 'legs' }))}
+                sx={{
+                  width: 100,
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  backdropFilter: 'blur(4px)',
+                  color: 'white',
+                  borderColor: gameSettings.formatType === 'legs' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                  borderWidth: gameSettings.formatType === 'legs' ? 2 : 1,
+                  '&:hover': {
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                  },
+                  ...(gameSettings.formatType === 'legs' && {
+                    bgcolor: 'rgba(255, 255, 255, 0.15)',
+                  }),
+                  textTransform: 'none',
+                  height: 40,
+                  fontSize: '0.875rem'
+                }}
+              >
+                Legs
+              </Button>
+            </Box>
+          </Box>
+
+          {/* Format Count Dialog */}
+          <Dialog
+            open={formatCountDialogOpen}
+            onClose={() => setFormatCountDialogOpen(false)}
+            PaperProps={{
+              sx: {
+                bgcolor: theme.palette.background.paper,
+                color: theme.palette.text.primary,
+                width: '280px'
+              }
+            }}
+          >
+            <DialogTitle>Vælg antal {gameSettings.formatType === 'sets' ? 'sets' : 'legs'}
+            </DialogTitle>
+            <DialogContent>
+              <Box sx={{ 
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 1,
+                p: 2
+              }}>
+                {Array.from({ length: 21 }, (_, i) => i + 1).map((number) => (
+                  <Button
+                    key={number}
+                    onClick={() => {
+                      setGameSettings(prev => ({ 
+                        ...prev, 
+                        formatCount: number,
+                        sets: prev.formatType === 'sets' ? number : prev.sets,
+                        legs: prev.formatType === 'legs' ? number : prev.legs
+                      }));
+                      setFormatCountDialogOpen(false);
+                    }}
+                    sx={{
+                      height: 52,
+                      width: '100%',
+                      fontSize: '1.1rem',
+                      color: 'white',
+                      borderColor: gameSettings.formatCount === number ? 'rgba(255, 255, 255, 0.5)' : 'rgba(255, 255, 255, 0.2)',
+                      bgcolor: gameSettings.formatCount === number ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                      '&:hover': {
+                        bgcolor: 'rgba(255, 255, 255, 0.2)',
+                        borderColor: 'rgba(255, 255, 255, 0.5)',
+                      },
+                      '@media (min-width: 768px)': {
+                        padding: '1rem 2.5rem',
+                      }
+                    }}
+                  >
+                    {number}
+                  </Button>
+                ))}
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setFormatCountDialogOpen(false)} sx={{ color: 'white' }}>
+                Annuller
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            mb: 2,
+            gap: 2,
+            flexWrap: 'wrap'
+          }}>
+            <Typography sx={{ 
+              flex: 1,
+              minWidth: { xs: '100%', sm: 'auto' },
+              fontSize: { xs: '0.875rem', sm: '1rem' }
+            }}>In rules</Typography>
+            <Box sx={{ 
+              display: 'flex',
+              gap: 1,
+              width: { xs: '100%', sm: 292 },
+              justifyContent: { xs: 'space-between', sm: 'flex-end' }
+            }}>
+              <Button
+                variant="outlined"
+                onClick={() => setGameSettings(prev => ({ ...prev, inMode: 'straight' }))}
+                sx={{
+                  flex: { xs: 1, sm: 'none' },
+                  width: { sm: 140 },
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  backdropFilter: 'blur(4px)',
+                  color: 'white',
+                  borderColor: gameSettings.inMode === 'straight' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                  borderWidth: gameSettings.inMode === 'straight' ? 2 : 1,
+                  '&:hover': {
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                  },
+                  ...(gameSettings.inMode === 'straight' && {
+                    bgcolor: 'rgba(255, 255, 255, 0.15)',
+                  }),
+                  textTransform: 'none',
+                  height: 40,
+                  fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                }}
+              >
+                Straight
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => setGameSettings(prev => ({ ...prev, inMode: 'double' }))}
+                sx={{
+                  flex: { xs: 1, sm: 'none' },
+                  width: { sm: 140 },
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  backdropFilter: 'blur(4px)',
+                  color: 'white',
+                  borderColor: gameSettings.inMode === 'double' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                  borderWidth: gameSettings.inMode === 'double' ? 2 : 1,
+                  '&:hover': {
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                  },
+                  ...(gameSettings.inMode === 'double' && {
+                    bgcolor: 'rgba(255, 255, 255, 0.15)',
+                  }),
+                  textTransform: 'none',
+                  height: 40,
+                  fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                }}
+              >
+                Double
               </Button>
             </Box>
           </Box>
@@ -697,57 +1299,94 @@ const X01Setup = () => {
             display: 'flex', 
             alignItems: 'center', 
             mb: 2,
-            gap: 2 
+            gap: 2,
+            flexWrap: 'wrap'
           }}>
-            <Typography sx={{ flex: 1 }}>In rules</Typography>
-            <Box sx={{ flex: 1 }}>
+            <Typography sx={{ 
+              flex: 1,
+              minWidth: { xs: '100%', sm: 'auto' },
+              fontSize: { xs: '0.875rem', sm: '1rem' }
+            }}>Out rules</Typography>
+            <Box sx={{ 
+              display: 'flex',
+              gap: 1,
+              width: { xs: '100%', sm: 292 },
+              justifyContent: { xs: 'space-between', sm: 'flex-end' }
+            }}>
               <Button
                 variant="outlined"
-                onClick={() => setStartingInDialogOpen(true)}
-                fullWidth
+                onClick={() => setGameSettings(prev => ({ ...prev, outMode: 'straight' }))}
                 sx={{
+                  flex: { xs: 1, sm: 'none' },
+                  width: { sm: 85 },
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  backdropFilter: 'blur(4px)',
                   color: 'white',
-                  borderColor: 'rgba(255, 255, 255, 0.2)',
-                  justifyContent: 'space-between',
+                  borderColor: gameSettings.outMode === 'straight' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                  borderWidth: gameSettings.outMode === 'straight' ? 2 : 1,
                   '&:hover': {
                     borderColor: 'rgba(255, 255, 255, 0.3)',
                     bgcolor: 'rgba(255, 255, 255, 0.1)',
                   },
+                  ...(gameSettings.outMode === 'straight' && {
+                    bgcolor: 'rgba(255, 255, 255, 0.15)',
+                  }),
                   textTransform: 'none',
-                  py: 1
+                  height: 40,
+                  fontSize: { xs: '0.75rem', sm: '0.875rem' }
                 }}
               >
-                {gameSettings.inMode === 'straight' ? 'Straight in' : 'Double in'}
+                Straight
               </Button>
-            </Box>
-          </Box>
-
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'flex-start', 
-            mb: 2,
-            gap: 2 
-          }}>
-            <Typography sx={{ flex: 1 }}>Out rules</Typography>
-            <Box sx={{ flex: 1 }}>
               <Button
                 variant="outlined"
-                onClick={() => setOutRulesDialogOpen(true)}
-                fullWidth
+                onClick={() => setGameSettings(prev => ({ ...prev, outMode: 'double' }))}
                 sx={{
+                  flex: { xs: 1, sm: 'none' },
+                  width: { sm: 85 },
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  backdropFilter: 'blur(4px)',
                   color: 'white',
-                  borderColor: 'rgba(255, 255, 255, 0.2)',
-                  justifyContent: 'space-between',
+                  borderColor: gameSettings.outMode === 'double' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                  borderWidth: gameSettings.outMode === 'double' ? 2 : 1,
                   '&:hover': {
                     borderColor: 'rgba(255, 255, 255, 0.3)',
                     bgcolor: 'rgba(255, 255, 255, 0.1)',
                   },
+                  ...(gameSettings.outMode === 'double' && {
+                    bgcolor: 'rgba(255, 255, 255, 0.15)',
+                  }),
                   textTransform: 'none',
-                  py: 1,
-                  mb: 2
+                  height: 40,
+                  fontSize: { xs: '0.75rem', sm: '0.875rem' }
                 }}
               >
-                {gameSettings.outMode === 'double' ? 'Double out' : 'Kommer snart'}
+                Double
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => setGameSettings(prev => ({ ...prev, outMode: 'master' }))}
+                sx={{
+                  flex: { xs: 1, sm: 'none' },
+                  width: { sm: 85 },
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  backdropFilter: 'blur(4px)',
+                  color: 'white',
+                  borderColor: gameSettings.outMode === 'master' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                  borderWidth: gameSettings.outMode === 'master' ? 2 : 1,
+                  '&:hover': {
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                  },
+                  ...(gameSettings.outMode === 'master' && {
+                    bgcolor: 'rgba(255, 255, 255, 0.15)',
+                  }),
+                  textTransform: 'none',
+                  height: 40,
+                  fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                }}
+              >
+                Master
               </Button>
             </Box>
           </Box>
@@ -796,7 +1435,7 @@ const X01Setup = () => {
         </StyledPaper>
 
         {/* Game Options */}
-        <StyledPaper>
+        <StyledPaper sx={{ mb: { xs: 1, sm: 2 } }}>
           <Box sx={{ 
             display: 'flex', 
             alignItems: 'center', 
@@ -835,16 +1474,17 @@ const X01Setup = () => {
           onClick={handleStartGame}
           sx={{
             py: 2,
-            bgcolor: theme.palette.primary.main,
+            bgcolor: '#00875A',
             '&:hover': {
-              bgcolor: theme.palette.primary.dark,
+              bgcolor: '#006644',
             },
             borderRadius: theme.shape.borderRadius * 2,
             textTransform: 'none',
-            fontSize: '1rem'
+            fontSize: '1rem',
+            mb: { xs: 1, sm: 2 }
           }}
         >
-          Let's Play Darts
+          Start game
         </Button>
 
         {/* Edit Player Name Dialog */}
@@ -1537,6 +2177,7 @@ const X01Setup = () => {
         />
       </Container>
     </Box>
+    </NavigationLayout>
   );
 };
 
