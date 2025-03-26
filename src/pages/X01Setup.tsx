@@ -202,20 +202,10 @@ const X01Setup = () => {
           score: 501, 
           type: 'user',
           avatar: currentUser.photoURL || undefined 
-        },
-        { 
-          id: 'guest-2', 
-          name: '', 
-          score: 501, 
-          type: 'guest', 
-          avatar: undefined 
         }
       ];
     }
-    return [
-      { id: 'guest-1', name: '', score: 501, type: 'guest', avatar: undefined },
-      { id: 'guest-2', name: '', score: 501, type: 'guest', avatar: undefined }
-    ];
+    return [];
   });
   const [selectedPlayer, setSelectedPlayer] = useState<number | null>(null);
   const [editingPlayer, setEditingPlayer] = useState<{index: number, name: string} | null>(null);

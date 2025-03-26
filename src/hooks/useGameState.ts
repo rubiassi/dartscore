@@ -19,21 +19,50 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
   let newState: GameState;
   
   switch (action.type) {
-    case 'ADD_THROW':
-      newState = {
+    case 'ADD_THROW': {
+      const { playerId, throwData } = action;
+      const playerData = state.playerGameData[playerId] || {
+        throwHistory: [],
+        legsWon: [],
+        setsWon: 0,
+        playerId: playerId
+      };
+
+      const currentLegDarts = (state.currentLegDarts[playerId] || 0) + throwData.dartsUsed;
+      const currentScore = state.scores[playerId] - throwData.score;
+      const legAverage = currentLegDarts > 0 ? (currentScore * 3) / currentLegDarts : 0;
+
+      return {
         ...state,
         playerGameData: {
           ...state.playerGameData,
-          [action.playerId]: {
-            ...state.playerGameData[action.playerId],
-            throwHistory: [
-              ...state.playerGameData[action.playerId].throwHistory,
-              action.throwData
-            ]
+          [playerId]: {
+            ...playerData,
+            throwHistory: [...playerData.throwHistory, {
+              ...throwData,
+              isCheckout: currentScore === 0,
+              doublesAttempted: throwData.doublesAttempted || 0
+            }]
           }
+        },
+        scores: {
+          ...state.scores,
+          [playerId]: currentScore
+        },
+        lastThrows: {
+          ...state.lastThrows,
+          [playerId]: [throwData.score, ...(state.lastThrows[playerId] || [])].slice(0, 3)
+        },
+        currentLegDarts: {
+          ...state.currentLegDarts,
+          [playerId]: currentLegDarts
+        },
+        currentLegAverage: {
+          ...state.currentLegAverage,
+          [playerId]: legAverage
         }
       };
-      return newState;
+    }
 
     case 'ADD_LEG_WIN':
       
@@ -177,6 +206,7 @@ export const useGameState = (gameConfig: GameConfig) => {
       .map(player => [
         player.id,
         {
+          playerId: player.id,
           throwHistory: [],
           legsWon: [],
           setsWon: 0

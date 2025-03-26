@@ -324,23 +324,27 @@ const X01Game: React.FC = () => {
     const currentScore = scores[currentPlayer.id];
     const newScore = currentScore - score;
 
-    // Opdater score
+    // Opdater score og statistik
     dispatch({ 
-      type: 'UPDATE_SCORE', 
-      playerId: currentPlayer.id, 
-      score: newScore 
+      type: 'ADD_THROW',
+      playerId: currentPlayer.id,
+      throwData: {
+        score,
+        dartsUsed,
+        doublesAttempted,
+        isCheckout: newScore === 0,
+        timestamp: Date.now()
+      }
     });
 
     // Hvis det er en checkout (newScore === 0)
     if (newScore === 0) {
-      
       // Opdater legs won for spilleren og tjek spilstatus i callback
       dispatch({ 
         type: 'ADD_LEG_WIN', 
         playerId: currentPlayer.id,
         darts: dartsUsed,
         callback: (updatedState) => {
-          
           // Tjek om sættet er vundet baseret på opdateret data
           if (shouldUpdateSet()) {
             dispatch({ 
@@ -402,11 +406,43 @@ const X01Game: React.FC = () => {
           <GameStats 
             player1={{
               name: player1.name,
-              stats: { ...playerStats[player1.id], gameData: gameState.playerGameData[player1.id] }
+              stats: {
+                ...playerStats[player1.id],
+                gameData: gameState.playerGameData[player1.id],
+                averages: {
+                  overall: playerStats[player1.id].averages.overall,
+                  set: playerStats[player1.id].averages.set,
+                  leg: playerStats[player1.id].averages.leg,
+                  firstNine: playerStats[player1.id].averages.firstNine
+                },
+                checkouts: {
+                  percentage: playerStats[player1.id].checkouts.percentage,
+                  successful: playerStats[player1.id].checkouts.successful,
+                  attempts: playerStats[player1.id].checkouts.attempts
+                },
+                legsWon: playerStats[player1.id].legsWon,
+                scoring: playerStats[player1.id].scoring
+              }
             }}
             player2={{
               name: player2.name,
-              stats: { ...playerStats[player2.id], gameData: gameState.playerGameData[player2.id] }
+              stats: {
+                ...playerStats[player2.id],
+                gameData: gameState.playerGameData[player2.id],
+                averages: {
+                  overall: playerStats[player2.id].averages.overall,
+                  set: playerStats[player2.id].averages.set,
+                  leg: playerStats[player2.id].averages.leg,
+                  firstNine: playerStats[player2.id].averages.firstNine
+                },
+                checkouts: {
+                  percentage: playerStats[player2.id].checkouts.percentage,
+                  successful: playerStats[player2.id].checkouts.successful,
+                  attempts: playerStats[player2.id].checkouts.attempts
+                },
+                legsWon: playerStats[player2.id].legsWon,
+                scoring: playerStats[player2.id].scoring
+              }
             }}
           />
         );
@@ -457,7 +493,7 @@ const X01Game: React.FC = () => {
                   legsWon={playerLegsWon}
                   dartsThrown={playerCurrentLegDarts}
                   doubleAttempts={stats.checkouts.attempts}
-                  checkoutThrows={0}
+                  checkoutThrows={stats.checkouts.successful}
                   successfulCheckouts={stats.checkouts.successful}
                   onUpdateScore={handleScore}
                 >

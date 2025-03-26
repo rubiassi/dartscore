@@ -5,6 +5,7 @@ export interface ThrowHistory {
   dartsUsed: number;
   doublesAttempted: number;
   isCheckout: boolean;
+  timestamp: number;
 }
 
 export interface PlayerGameData {
@@ -57,6 +58,6 @@ export interface GameState {
 }
 
 export interface CheckoutGuide {
-  score: number;
-  combinations: string[];
+  route: string;
+  remaining: number;
 } 
