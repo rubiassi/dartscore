@@ -7,6 +7,9 @@ import X01Setup from '../pages/X01Setup';
 import X01Game from '../pages/X01Game';
 import NavigationLayout from '../components/layout/NavigationLayout';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
+import ProfilePage from '../pages/ProfilePage';
+import FriendsPage from '../pages/FriendsPage';
+import StatisticsPage from '../pages/StatisticsPage';
 
 // Wrapper component for X01Game to handle state
 const X01GameWrapper = () => {
@@ -71,11 +74,38 @@ const AppRoutes = () => {
         } 
       />
       
+      <Route 
+        path="/profile" 
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
+          </ProtectedRoute>
+        } 
+      />
+      
+      <Route
+        path="/friends"
+        element={
+          <ProtectedRoute>
+            <NavigationLayout>
+              <FriendsPage />
+            </NavigationLayout>
+          </ProtectedRoute>
+        }
+      />
+      
       {/* Placeholder routes */}
-      <Route path="/profile" element={<NavigationLayout><div>Profile Coming Soon</div></NavigationLayout>} />
-      <Route path="/friends" element={<NavigationLayout><div>Friends Coming Soon</div></NavigationLayout>} />
       <Route path="/teams" element={<NavigationLayout><div>Teams Coming Soon</div></NavigationLayout>} />
-      <Route path="/statistics" element={<NavigationLayout><div>Statistics Coming Soon</div></NavigationLayout>} />
+      <Route
+        path="/statistics"
+        element={
+          <ProtectedRoute>
+            <NavigationLayout>
+              <StatisticsPage />
+            </NavigationLayout>
+          </ProtectedRoute>
+        }
+      />
       <Route path="/history" element={<NavigationLayout><div>History Coming Soon</div></NavigationLayout>} />
       <Route path="/achievements" element={<NavigationLayout><div>Achievements Coming Soon</div></NavigationLayout>} />
       <Route path="/settings" element={<NavigationLayout><div>Settings Coming Soon</div></NavigationLayout>} />

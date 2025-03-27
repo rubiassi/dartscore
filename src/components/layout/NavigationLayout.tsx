@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton, ListItemIcon, ListItemText, IconButton, useTheme, useMediaQuery, Dialog, DialogTitle, DialogContent, DialogActions, Button, CssBaseline } from '@mui/material';
+import { Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton, ListItemIcon, ListItemText, IconButton, useTheme, useMediaQuery, Dialog, DialogTitle, DialogContent, DialogActions, Button, CssBaseline, Badge, Menu, MenuItem, ListItemAvatar, Avatar, Divider } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useGame } from '../../context/GameContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { getFriendRequests, getGameInvites, respondToGameInvite, FriendRequest, GameInvite } from '../../services/friendsService';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import SportsScoreIcon from '@mui/icons-material/SportsScore';
 import PersonIcon from '@mui/icons-material/Person';
@@ -16,6 +18,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import { styled } from '@mui/material/styles';
 import { Theme } from '@mui/material/styles';
 
@@ -174,6 +177,11 @@ const NavigationLayout = ({ children }: NavigationLayoutProps) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showGameInterruptDialog, setShowGameInterruptDialog] = useState(false);
   const { showingStats, setShowingStats } = useGame();
+  const { currentUser } = useAuth();
+  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [gameInvites, setGameInvites] = useState<GameInvite[]>([]);
+  const [notificationAnchorEl, setNotificationAnchorEl] = useState<null | HTMLElement>(null);
+  const [totalNotifications, setTotalNotifications] = useState(0);
 
   // Check if we're in a game
   const isInGame = location.pathname.includes('/x01game');
@@ -196,6 +204,32 @@ const NavigationLayout = ({ children }: NavigationLayoutProps) => {
       setIsOpen(false);
     }
   }, [isMobile, isTablet]);
+
+  // Load notifications
+  useEffect(() => {
+    if (currentUser) {
+      const loadNotifications = async () => {
+        try {
+          const [requests, invites] = await Promise.all([
+            getFriendRequests(currentUser.uid),
+            getGameInvites(currentUser.uid)
+          ]);
+          
+          setFriendRequests(requests);
+          setGameInvites(invites);
+          setTotalNotifications(requests.length + invites.length);
+        } catch (error) {
+          console.error('Error loading notifications:', error);
+        }
+      };
+
+      loadNotifications();
+      
+      // Opdater hver 30. sekund
+      const interval = setInterval(loadNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [currentUser]);
 
   const handleDrawerToggle = () => {
     if (isMobile) {
@@ -236,6 +270,35 @@ const NavigationLayout = ({ children }: NavigationLayoutProps) => {
 
   const handleBackToGame = () => {
     setShowingStats(false);
+  };
+
+  const handleNotificationClick = (event: React.MouseEvent<HTMLElement>) => {
+    setNotificationAnchorEl(event.currentTarget);
+  };
+
+  const handleNotificationClose = () => {
+    setNotificationAnchorEl(null);
+  };
+
+  const handleAcceptGameInvite = async (invite: GameInvite) => {
+    try {
+      await respondToGameInvite(invite.id, 'accepted');
+      // Naviger til spillet
+      navigate(`/x01game?inviteId=${invite.id}`);
+      handleNotificationClose();
+    } catch (error) {
+      console.error('Error accepting game invite:', error);
+    }
+  };
+
+  const handleRejectGameInvite = async (invite: GameInvite) => {
+    try {
+      await respondToGameInvite(invite.id, 'rejected');
+      setGameInvites(prev => prev.filter(i => i.id !== invite.id));
+      setTotalNotifications(prev => prev - 1);
+    } catch (error) {
+      console.error('Error rejecting game invite:', error);
+    }
   };
 
   const getCurrentPageTitle = () => {
@@ -302,6 +365,90 @@ const NavigationLayout = ({ children }: NavigationLayoutProps) => {
     </Box>
   );
 
+  const renderNotificationMenu = () => (
+    <Menu
+      anchorEl={notificationAnchorEl}
+      open={Boolean(notificationAnchorEl)}
+      onClose={handleNotificationClose}
+      PaperProps={{
+        sx: {
+          maxWidth: 360,
+          maxHeight: 400,
+          overflow: 'auto'
+        }
+      }}
+    >
+      {friendRequests.length > 0 && (
+        <>
+          <MenuItem sx={{ justifyContent: 'center' }}>
+            <Typography variant="subtitle2" color="text.secondary">
+              Venneanmodninger
+            </Typography>
+          </MenuItem>
+          {friendRequests.map((request) => (
+            <MenuItem key={request.id} onClick={() => navigate('/friends')}>
+              <ListItemAvatar>
+                <Avatar src={request.senderPhotoURL}>
+                  {request.senderName?.[0]}
+                </Avatar>
+              </ListItemAvatar>
+              <ListItemText 
+                primary={request.senderName}
+                secondary="Vil gerne være venner"
+              />
+            </MenuItem>
+          ))}
+          <Divider />
+        </>
+      )}
+      
+      {gameInvites.length > 0 && (
+        <>
+          <MenuItem sx={{ justifyContent: 'center' }}>
+            <Typography variant="subtitle2" color="text.secondary">
+              Spilinvitationer
+            </Typography>
+          </MenuItem>
+          {gameInvites.map((invite) => (
+            <MenuItem key={invite.id} sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Typography variant="body2">
+                  {invite.senderName} har inviteret dig til {invite.gameType}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="primary"
+                  onClick={() => handleAcceptGameInvite(invite)}
+                >
+                  Acceptér
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  onClick={() => handleRejectGameInvite(invite)}
+                >
+                  Afvis
+                </Button>
+              </Box>
+            </MenuItem>
+          ))}
+        </>
+      )}
+      
+      {totalNotifications === 0 && (
+        <MenuItem disabled>
+          <Typography variant="body2" color="text.secondary">
+            Ingen nye notifikationer
+          </Typography>
+        </MenuItem>
+      )}
+    </Menu>
+  );
+
   return (
     <RootContainer>
       <CssBaseline />
@@ -339,6 +486,16 @@ const NavigationLayout = ({ children }: NavigationLayoutProps) => {
             >
               {getCurrentPageTitle()}
             </Typography>
+            {/* Notifikations knap */}
+            <IconButton 
+              color="inherit"
+              onClick={handleNotificationClick}
+              sx={{ ml: 2 }}
+            >
+              <Badge badgeContent={totalNotifications} color="error">
+                <NotificationsIcon />
+              </Badge>
+            </IconButton>
             {isInGame && (
               <IconButton 
                 color="inherit" 
@@ -350,6 +507,8 @@ const NavigationLayout = ({ children }: NavigationLayoutProps) => {
           </Box>
         </StyledToolbar>
       </StyledAppBar>
+
+      {renderNotificationMenu()}
 
       {/* Mobile drawer */}
       <StyledDrawer

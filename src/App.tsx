@@ -1,7 +1,7 @@
 import React from 'react';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { theme } from './theme';
+import theme from './theme';
 import { BrowserRouter } from 'react-router-dom';
 import { GameProvider } from './context/GameContext';
 import { AuthProvider } from './contexts/AuthContext';
